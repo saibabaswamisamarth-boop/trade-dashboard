@@ -62,8 +62,7 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
 
     if batch > total_batches:
         return {"batch": batch, "total_batches": total_batches, "data": []}
-
-    current_batch = batches[batch - 1]
+current_batch = batches[batch - 1]
 
 for symbol, sid in current_batch:
     try:
