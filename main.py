@@ -48,6 +48,12 @@ from fastapi import FastAPI
 from dhanhq import dhanhq
 
 app = FastAPI()
+@app.get("/health")
+def health():
+    return {
+        "CLIENT_ID": bool(os.getenv("CLIENT_ID")),
+        "ACCESS_TOKEN": bool(os.getenv("ACCESS_TOKEN"))
+    }
 
 import os
 
@@ -58,7 +64,9 @@ ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 
 
 
-dhan = dhanhq(CLIENT_ID, ACCESS_TOKEN)
+dhan = get_dhan_client()
+quote = dhan.quote_data(...)
+
 
 @app.get("/", response_class=HTMLResponse)
 def pro_dashboard():
@@ -520,3 +528,16 @@ load();
 </html>
 """
     return HTMLResponse(content=html)
+import os
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from dhanhq import dhanhq
+import time
+def get_dhan_client():
+    client_id = os.getenv("CLIENT_ID")
+    access_token = os.getenv("ACCESS_TOKEN")
+
+    if not client_id or not access_token:
+        raise Exception("Dhan ENV variables not set")
+
+    return dhanhq(client_id, access_token)
