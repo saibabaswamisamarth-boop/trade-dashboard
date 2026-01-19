@@ -143,3 +143,107 @@ FO_STOCKS_FULL = {
     "UPL": 11287,
     "WIPRO": 3787
 }
+from fastapi.responses import HTMLResponse
+
+@app.get("/fo-dashboard", response_class=HTMLResponse)
+def fo_dashboard():
+    html = """
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>F&O Live Scanner</title>
+<meta http-equiv="refresh" content="10">
+<style>
+body {
+  background:#0b1220;
+  color:#e5e7eb;
+  font-family: Arial;
+}
+.container {
+  width:90%;
+  margin:auto;
+}
+h1 {
+  text-align:center;
+  margin:20px 0;
+}
+table {
+  width:100%;
+  border-collapse:collapse;
+}
+th, td {
+  padding:12px;
+  border-bottom:1px solid #1f2937;
+  text-align:center;
+}
+th {
+  background:#0f172a;
+}
+.badge {
+  padding:4px 12px;
+  border-radius:20px;
+  font-weight:bold;
+}
+.green {
+  background:#064e3b;
+  color:#34d399;
+}
+.yellow {
+  background:#78350f;
+  color:#facc15;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h1>🔥 F&O Live Market Pulse</h1>
+  <table id="tbl">
+    <tr>
+      <th>Symbol</th>
+      <th>Last Price</th>
+      <th>Volume</th>
+      <th>Strength</th>
+    </tr>
+  </table>
+</div>
+
+<script>
+async function loadData(){
+  const r = await fetch('/fo-live-scan');
+  const data = await r.json();
+
+  let rows = `
+    <tr>
+      <th>Symbol</th>
+      <th>Last Price</th>
+      <th>Volume</th>
+      <th>Strength</th>
+    </tr>
+  `;
+
+  data.forEach(x => {
+    let badge = x.score == 3
+      ? '<span class="badge green">STRONG</span>'
+      : '<span class="badge yellow">MEDIUM</span>';
+
+    rows += `
+      <tr>
+        <td>${x.symbol}</td>
+        <td>${x.last_price}</td>
+        <td>${x.volume}</td>
+        <td>${badge}</td>
+      </tr>
+    `;
+  });
+
+  document.getElementById("tbl").innerHTML = rows;
+}
+
+loadData();
+</script>
+</body>
+</html>
+"""
+    return HTMLResponse(html)
