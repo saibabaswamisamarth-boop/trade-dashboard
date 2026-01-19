@@ -14,3 +14,13 @@ def pro_dashboard():
         "<h1>Render Deployment Successful 🎉</h1>"
         "</body></html>"
     )
+@app.get("/market-pulse")
+def market_pulse():
+    return [
+        {
+            "symbol": "RELIANCE",
+            "last_price": 1413.6,
+            "volume": 20392765,
+            "status": "ACTIVE"
+        }
+    ]
