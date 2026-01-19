@@ -65,59 +65,52 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
 
     current_batch = batches[batch - 1]
 
-    for symbol, sid in current_batch:
-        try:
-            quote = dhan.quote_data(
-                securities={"NSE_EQ": [sid]}
-            )
+for symbol, sid in current_batch:
+    try:
+        quote = dhan.quote_data(
+            securities={"NSE_EQ": [sid]}
+        )
 
-            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
-            if str(sid) not in nse:
-                continue
+        nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
+        if str(sid) not in nse:
+            continue
 
-            data = nse[str(sid)]
-            ohlc = data.get("ohlc", {})
+        data = nse[str(sid)]
+        ohlc = data.get("ohlc", {})
 
-            last_price = data.get("last_price", 0)
-            open_price = ohlc.get("open", 0)
-            high_price = ohlc.get("high", 0)
-            volume = data.get("volume", 0)
-            avg_price = data.get("average_price", last_price)
+        last_price = data.get("last_price", 0)
+        open_price = ohlc.get("open", 0)
+        high_price = ohlc.get("high", 0)
+        volume = data.get("volume", 0)
+        avg_price = data.get("average_price", last_price)
 
-            # base signals
-            price_strength = last_price > open_price
-            breakout_zone = last_price > (high_price * 0.8)
-            volume_spike = volume > (avg_price * 1000)
+        # base signals
+        price_strength = last_price > open_price
+        breakout_zone = last_price > (high_price * 0.8)
+        volume_spike = volume > (avg_price * 1000)
 
-            score = sum([price_strength, breakout_zone, volume_spike])
+        score = sum([price_strength, breakout_zone, volume_spike])
 
-            # tech indicators
-            c_strength = candle_strength(ohlc, last_price)
-            vwap_delta = vwap_proxy(avg_price, last_price)
+        # tech indicators
+        c_strength = candle_strength(ohlc, last_price)
+        vwap_delta = vwap_proxy(avg_price, last_price)
 
-            score += (c_strength > 0.3)
-            score += (vwap_delta > 0)
+        score += (c_strength > 0.3)
+        score += (vwap_delta > 0)
 
-            if score >= 2:
-                results.append({
-                    "symbol": symbol,
-                    "last_price": last_price,
-                    "volume": volume,
-                    "score": score,
-                    "candle_strength": c_strength,
-                    "vwap_delta": vwap_delta
-                })
+        if score >= 2:
+            results.append({
+                "symbol": symbol,
+                "last_price": last_price,
+                "volume": volume,
+                "score": score,
+                "candle_strength": c_strength,
+                "vwap_delta": vwap_delta
+            })
 
-        except Exception as e:
-            print(f"{symbol} error: {e}")
+    except Exception as e:
+        print(f"{symbol} error: {e}")
 
-    results = sorted(results, key=lambda x: x["volume"], reverse=True)
-
-    return {
-        "batch": batch,
-        "total_batches": total_batches,
-        "data": results
-    }
 FO_STOCKS_FULL = {
     "ADANIENT": 25,
     "ADANIPORTS": 15083,
