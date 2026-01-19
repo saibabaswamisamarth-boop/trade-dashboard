@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse
+from dhanhq import dhanhq
+import os
 
 app = FastAPI()
 
@@ -24,18 +26,16 @@ def market_pulse():
             "status": "ACTIVE"
         }
     ]
-FO_STOCKS = {
-    "RELIANCE": 2885,
-    "TCS": 11536,
-    "INFY": 1594,
-    "HDFCBANK": 1333,
-    "ICICIBANK": 4963,
-    "SBIN": 3045,
-    "AXISBANK": 5900,
-    "LT": 11483,
-    "ITC": 1660,
-    "BAJFINANCE": 317
+FO_STOCKS_FULL = {
+    "ADANIENT": 25,
+    "ADANIPORTS": 15083,
+    "APOLLOHOSP": 157,
+    ...
+    "WIPRO": 3787
 }
+
+BATCH_SIZE = 15
+
 from dhanhq import dhanhq
 import os
 
@@ -47,6 +47,7 @@ def get_dhan_client():
         raise Exception("Dhan ENV variables not set")
 
     return dhanhq(client_id, access_token)
+
 from fastapi import Query
 
 from fastapi import Query
@@ -62,53 +63,46 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
 
     if batch > total_batches:
         return {"batch": batch, "total_batches": total_batches, "data": []}
-current_batch = batches[batch - 1]
 
-for symbol, sid in current_batch:
-    try:
-        quote = dhan.quote_data(
-            securities={"NSE_EQ": [sid]}
-        )
+    current_batch = batches[batch - 1]
 
-        nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
-        if str(sid) not in nse:
-            continue
+    for symbol, sid in current_batch:
+        try:
+            quote = dhan.quote_data(
+                securities={"NSE_EQ": [sid]}
+            )
 
-        data = nse[str(sid)]
-        ohlc = data.get("ohlc", {})
+            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
+            if str(sid) not in nse:
+                continue
 
-        last_price = data.get("last_price", 0)
-        open_price = ohlc.get("open", 0)
-        high_price = ohlc.get("high", 0)
-        volume = data.get("volume", 0)
-        avg_price = data.get("average_price", last_price)
+            data = nse[str(sid)]
+            ohlc = data.get("ohlc", {})
 
-        # base signals
-        price_strength = last_price > open_price
-        breakout_zone = last_price > (high_price * 0.8)
-        volume_spike = volume > (avg_price * 1000)
+            last_price = data.get("last_price", 0)
+            volume = data.get("volume", 0)
+            avg_price = data.get("average_price", last_price)
 
-        score = sum([price_strength, breakout_zone, volume_spike])
+            score = 0
+            score += last_price > ohlc.get("open", 0)
+            score += last_price > avg_price
 
-        # tech indicators
-        c_strength = candle_strength(ohlc, last_price)
-        vwap_delta = vwap_proxy(avg_price, last_price)
+            if score >= 1:
+                results.append({
+                    "symbol": symbol,
+                    "last_price": last_price,
+                    "volume": volume,
+                    "score": score
+                })
 
-        score += (c_strength > 0.3)
-        score += (vwap_delta > 0)
+        except Exception as e:
+            print(symbol, e)
 
-        if score >= 2:
-            results.append({
-                "symbol": symbol,
-                "last_price": last_price,
-                "volume": volume,
-                "score": score,
-                "candle_strength": c_strength,
-                "vwap_delta": vwap_delta
-            })
-
-    except Exception as e:
-        print(f"{symbol} error: {e}")
+    return {
+        "batch": batch,
+        "total_batches": total_batches,
+        "data": results
+    }
 
 FO_STOCKS_FULL = {
     "ADANIENT": 25,
@@ -160,11 +154,6 @@ FO_STOCKS_FULL = {
     "WIPRO": 3787
 }
 from fastapi.responses import HTMLResponse
-BATCH_SIZE = 15
-
-def get_batches(stock_dict):
-    items = list(stock_dict.items())
-    return [items[i:i+BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
 
 @app.get("/fo-dashboard", response_class=HTMLResponse)
 def fo_dashboard():
