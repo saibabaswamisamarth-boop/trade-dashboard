@@ -47,13 +47,27 @@ def get_dhan_client():
         raise Exception("Dhan ENV variables not set")
 
     return dhanhq(client_id, access_token)
+from fastapi import Query
+
 @app.get("/fo-live-scan")
-def fo_live_scan():
+def fo_live_scan(batch: int = Query(1, ge=1)):
 
     dhan = get_dhan_client()
     results = []
 
-    for symbol, sid in FO_STOCKS.items():
+    batches = get_batches(FO_STOCKS_FULL)
+    total_batches = len(batches)
+
+    if batch > total_batches:
+        return {
+            "batch": batch,
+            "total_batches": total_batches,
+            "data": []
+        }
+
+    current_batch = batches[batch - 1]
+
+    for symbol, sid in current_batch:
         try:
             quote = dhan.quote_data(
                 securities={"NSE_EQ": [sid]}
@@ -72,7 +86,6 @@ def fo_live_scan():
             volume = data.get("volume", 0)
             avg_price = data.get("average_price", 1)
 
-            # Market Pulse logic (simple + safe)
             price_strength = last_price > open_price
             breakout_zone = last_price > (high_price * 0.8)
             volume_spike = volume > (avg_price * 1000)
@@ -88,12 +101,15 @@ def fo_live_scan():
                 })
 
         except Exception as e:
-            print(f"Error in {symbol}: {e}")
+            print(f"{symbol} error: {e}")
 
-    # Top movers first
     results = sorted(results, key=lambda x: x["volume"], reverse=True)
 
-    return results[:10]
+    return {
+        "batch": batch,
+        "total_batches": total_batches,
+        "data": results
+    }
 FO_STOCKS_FULL = {
     "ADANIENT": 25,
     "ADANIPORTS": 15083,
@@ -144,6 +160,11 @@ FO_STOCKS_FULL = {
     "WIPRO": 3787
 }
 from fastapi.responses import HTMLResponse
+BATCH_SIZE = 15
+
+def get_batches(stock_dict):
+    items = list(stock_dict.items())
+    return [items[i:i+BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
 
 @app.get("/fo-dashboard", response_class=HTMLResponse)
 def fo_dashboard():
@@ -210,9 +231,12 @@ th {
 </div>
 
 <script>
+let batch = 1;
+
 async function loadData(){
-  const r = await fetch('/fo-live-scan');
-  const data = await r.json();
+  const r = await fetch(`/fo-live-scan?batch=${batch}`);
+  const res = await r.json();
+  const data = res.data;
 
   let rows = `
     <tr>
@@ -239,9 +263,13 @@ async function loadData(){
   });
 
   document.getElementById("tbl").innerHTML = rows;
+
+  batch++;
+  if (batch > res.total_batches) batch = 1;
 }
 
 loadData();
+setInterval(loadData, 10000);
 </script>
 </body>
 </html>
