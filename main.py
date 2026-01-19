@@ -1,4 +1,19 @@
+import os
 import time
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from dhanhq import dhanhq
+
+app = FastAPI()
+def get_dhan_client():
+    client_id = os.getenv("CLIENT_ID")
+    access_token = os.getenv("ACCESS_TOKEN")
+
+    if not client_id or not access_token:
+        raise Exception("Dhan ENV variables not set")
+
+    return dhanhq(client_id, access_token)
+
 
 CACHE = {
     "snapshot": {
@@ -53,7 +68,8 @@ def health():
     return {
         "CLIENT_ID": bool(os.getenv("CLIENT_ID")),
         "ACCESS_TOKEN": bool(os.getenv("ACCESS_TOKEN"))
-    }
+}
+
 
 import os
 
