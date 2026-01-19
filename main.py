@@ -94,11 +94,23 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
 
             if score >= 2:
                 results.append({
-                    "symbol": symbol,
-                    "last_price": last_price,
-                    "volume": volume,
-                    "score": score
-                })
+    "symbol": symbol,
+    "last_price": last_price,
+    "volume": volume,
+    "score": score,
+    "candle_strength": c_strength,
+    "vwap_delta": vwap_delta
+})
+
+ohlc = data.get("ohlc", {})
+avg_price = data.get("average_price", last_price)
+
+c_strength = candle_strength(ohlc, last_price)
+vwap_delta = vwap_proxy(avg_price, last_price)
+
+# score enhance
+score += (c_strength > 0.3)
+score += (vwap_delta > 0)
 
         except Exception as e:
             print(f"{symbol} error: {e}")
@@ -110,6 +122,15 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
         "total_batches": total_batches,
         "data": results
     }
+ohlc = data.get("ohlc", {})
+avg_price = data.get("average_price", last_price)
+
+c_strength = candle_strength(ohlc, last_price)
+vwap_delta = vwap_proxy(avg_price, last_price)
+
+# enhance score
+score += (c_strength > 0.3)
+score += (vwap_delta > 0)
 FO_STOCKS_FULL = {
     "ADANIENT": 25,
     "ADANIPORTS": 15083,
@@ -275,3 +296,14 @@ setInterval(loadData, 10000);
 </html>
 """
     return HTMLResponse(html)
+def candle_strength(ohlc, last_price):
+    o = ohlc.get("open", 0)
+    h = ohlc.get("high", 0)
+    l = ohlc.get("low", 0)
+    if h == l:
+        return 0
+    return round((last_price - o) / (h - l), 2)  # -1 to +1 approx
+
+def vwap_proxy(avg_price, last_price):
+    # fast proxy; true VWAP needs ticks
+    return round(last_price - avg_price, 2)
