@@ -5,39 +5,32 @@ import os
 
 app = FastAPI()
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+# =========================
+# GLOBAL DATA (VERY IMPORTANT)
+# =========================
 
-@app.get("/pro-dashboard", response_class=HTMLResponse)
-def pro_dashboard():
-    return HTMLResponse(
-        "<html><body style='background:black;color:white;text-align:center;'>"
-        "<h1>Render Deployment Successful 🎉</h1>"
-        "</body></html>"
-    )
-@app.get("/market-pulse")
-def market_pulse():
-    return [
-        {
-            "symbol": "RELIANCE",
-            "last_price": 1413.6,
-            "volume": 20392765,
-            "status": "ACTIVE"
-        }
-    ]
 FO_STOCKS_FULL = {
     "ADANIENT": 25,
     "ADANIPORTS": 15083,
     "APOLLOHOSP": 157,
-    ...
+    "ASIANPAINT": 236,
+    "AXISBANK": 5900,
+    "BAJFINANCE": 317,
+    "RELIANCE": 2885,
+    "SBIN": 3045,
+    "TCS": 11536,
     "WIPRO": 3787
 }
 
 BATCH_SIZE = 15
 
-from dhanhq import dhanhq
-import os
+def get_batches(stock_dict):
+    items = list(stock_dict.items())
+    return [items[i:i+BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
+
+# =========================
+# DHAN CLIENT
+# =========================
 
 def get_dhan_client():
     client_id = os.getenv("CLIENT_ID")
@@ -48,9 +41,38 @@ def get_dhan_client():
 
     return dhanhq(client_id, access_token)
 
-from fastapi import Query
+# =========================
+# BASIC ROUTES
+# =========================
 
-from fastapi import Query
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.get("/market-pulse")
+def market_pulse():
+    return [
+        {
+            "symbol": "RELIANCE",
+            "last_price": 1413.6,
+            "volume": 20392765,
+            "status": "ACTIVE"
+        }
+    ]
+
+@app.get("/pro-dashboard", response_class=HTMLResponse)
+def pro_dashboard():
+    return """
+    <html>
+      <body style="background:black;color:white;text-align:center;">
+        <h1>Render Deployment Successful 🎉</h1>
+      </body>
+    </html>
+    """
+
+# =========================
+# F&O LIVE SCAN
+# =========================
 
 @app.get("/fo-live-scan")
 def fo_live_scan(batch: int = Query(1, ge=1)):
@@ -68,10 +90,7 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
 
     for symbol, sid in current_batch:
         try:
-            quote = dhan.quote_data(
-                securities={"NSE_EQ": [sid]}
-            )
-
+            quote = dhan.quote_data(securities={"NSE_EQ": [sid]})
             nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
             if str(sid) not in nse:
                 continue
@@ -104,174 +123,54 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
         "data": results
     }
 
-FO_STOCKS_FULL = {
-    "ADANIENT": 25,
-    "ADANIPORTS": 15083,
-    "APOLLOHOSP": 157,
-    "ASIANPAINT": 236,
-    "AXISBANK": 5900,
-    "BAJAJ-AUTO": 16669,
-    "BAJFINANCE": 317,
-    "BAJAJFINSV": 16675,
-    "BPCL": 526,
-    "BHARTIARTL": 10604,
-    "BRITANNIA": 547,
-    "CIPLA": 694,
-    "COALINDIA": 20374,
-    "DIVISLAB": 10940,
-    "DRREDDY": 881,
-    "EICHERMOT": 910,
-    "GRASIM": 1232,
-    "HCLTECH": 7229,
-    "HDFCBANK": 1333,
-    "HDFCLIFE": 467,
-    "HEROMOTOCO": 1348,
-    "HINDALCO": 1363,
-    "HINDUNILVR": 1394,
-    "ICICIBANK": 4963,
-    "INDUSINDBK": 5258,
-    "INFY": 1594,
-    "ITC": 1660,
-    "JSWSTEEL": 11723,
-    "KOTAKBANK": 1922,
-    "LT": 11483,
-    "M&M": 2031,
-    "MARUTI": 10999,
-    "NESTLEIND": 17963,
-    "NTPC": 11630,
-    "ONGC": 2475,
-    "POWERGRID": 14977,
-    "RELIANCE": 2885,
-    "SBIN": 3045,
-    "SUNPHARMA": 3351,
-    "TATAMOTORS": 3456,
-    "TATASTEEL": 3499,
-    "TCS": 11536,
-    "TECHM": 13538,
-    "TITAN": 3506,
-    "ULTRACEMCO": 11532,
-    "UPL": 11287,
-    "WIPRO": 3787
-}
-from fastapi.responses import HTMLResponse
+# =========================
+# DASHBOARD UI
+# =========================
 
 @app.get("/fo-dashboard", response_class=HTMLResponse)
 def fo_dashboard():
-    html = """
+    return """
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
 <title>F&O Live Scanner</title>
 <meta http-equiv="refresh" content="10">
 <style>
-body {
-  background:#0b1220;
-  color:#e5e7eb;
-  font-family: Arial;
-}
-.container {
-  width:90%;
-  margin:auto;
-}
-h1 {
-  text-align:center;
-  margin:20px 0;
-}
-table {
-  width:100%;
-  border-collapse:collapse;
-}
-th, td {
-  padding:12px;
-  border-bottom:1px solid #1f2937;
-  text-align:center;
-}
-th {
-  background:#0f172a;
-}
-.badge {
-  padding:4px 12px;
-  border-radius:20px;
-  font-weight:bold;
-}
-.green {
-  background:#064e3b;
-  color:#34d399;
-}
-.yellow {
-  background:#78350f;
-  color:#facc15;
-}
+body { background:#0b1220; color:#e5e7eb; font-family: Arial; }
+table { width:100%; border-collapse:collapse; }
+th,td { padding:12px; border-bottom:1px solid #1f2937; text-align:center; }
+th { background:#0f172a; }
+.green { background:#064e3b; color:#34d399; padding:4px 12px; border-radius:20px; }
+.yellow { background:#78350f; color:#facc15; padding:4px 12px; border-radius:20px; }
 </style>
 </head>
-
 <body>
-<div class="container">
-  <h1>🔥 F&O Live Market Pulse</h1>
-  <table id="tbl">
-    <tr>
-      <th>Symbol</th>
-      <th>Last Price</th>
-      <th>Volume</th>
-      <th>Strength</th>
-    </tr>
-  </table>
-</div>
+<h1 style="text-align:center;">🔥 F&O Live Market Pulse</h1>
+<table id="tbl"></table>
 
 <script>
 let batch = 1;
-
 async function loadData(){
   const r = await fetch(`/fo-live-scan?batch=${batch}`);
   const res = await r.json();
-  const data = res.data;
-
   let rows = `
-    <tr>
-      <th>Symbol</th>
-      <th>Last Price</th>
-      <th>Volume</th>
-      <th>Strength</th>
-    </tr>
+    <tr><th>Symbol</th><th>Price</th><th>Volume</th><th>Strength</th></tr>
   `;
-
-  data.forEach(x => {
-    let badge = x.score == 3
-      ? '<span class="badge green">STRONG</span>'
-      : '<span class="badge yellow">MEDIUM</span>';
-
-    rows += `
-      <tr>
-        <td>${x.symbol}</td>
-        <td>${x.last_price}</td>
-        <td>${x.volume}</td>
-        <td>${badge}</td>
-      </tr>
-    `;
+  res.data.forEach(x=>{
+    let badge = x.score==2 ? '<span class="green">STRONG</span>' :
+                             '<span class="yellow">MEDIUM</span>';
+    rows += `<tr>
+      <td>${x.symbol}</td>
+      <td>${x.last_price}</td>
+      <td>${x.volume}</td>
+      <td>${badge}</td>
+    </tr>`;
   });
-
   document.getElementById("tbl").innerHTML = rows;
-
-  batch++;
-  if (batch > res.total_batches) batch = 1;
+  batch++; if(batch>res.total_batches) batch=1;
 }
-
-loadData();
-setInterval(loadData, 10000);
+loadData(); setInterval(loadData,10000);
 </script>
 </body>
 </html>
 """
-    return HTMLResponse(html)
-def candle_strength(ohlc, last_price):
-    o = ohlc.get("open", 0)
-    h = ohlc.get("high", 0)
-    l = ohlc.get("low", 0)
-    if h == l:
-        return 0
-    return round((last_price - o) / (h - l), 2)  # -1 to +1 approx
-
-def vwap_proxy(avg_price, last_price):
-    # fast proxy; true VWAP needs ticks
-    return round(last_price - avg_price, 2)
