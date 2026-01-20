@@ -3,7 +3,8 @@ let batch = 1;
 
 async function loadData() {
   try {
-    const r = await fetch(`/market-pulse-v2?batch=${batch}`);
+    const r = await fetch(`https://trade-dashboard-dm3w.onrender.com/market-pulse-v2?batch=${batch}`);
+
     const res = await r.json();
 
     let rows = "";
@@ -40,3 +41,4 @@ async function loadData() {
 loadData();
 setInterval(loadData, 10000);
 </script>
+
