@@ -8,6 +8,48 @@ from stocks_master import FO_STOCKS
 print("Total stocks loaded:", len(FO_STOCKS))
 
 app = FastAPI()
+# =========================
+# MARKET PULSE V2 API
+# =========================
+
+@app.get("/market-pulse-v2")
+def market_pulse_v2(batch: int = Query(1, ge=1)):
+
+    dhan = get_dhan_client()
+    results = []
+
+    batches = get_batches(FO_STOCKS_FULL)
+    total_batches = len(batches)
+
+    if batch > total_batches:
+        return {"batch": batch, "total_batches": total_batches, "data": []}
+
+    current_batch = batches[batch - 1]
+
+    for symbol, sid in current_batch:
+        try:
+            quote = dhan.quote_data(
+                securities={"NSE_EQ": [sid]}
+            )
+
+            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
+            if str(sid) not in nse:
+                continue
+
+            data = nse[str(sid)]
+
+            # 🔥 ENGINE CALL
+            result = process_stock(symbol, data)
+            results.append(result)
+
+        except Exception as e:
+            print(symbol, e)
+
+    return {
+        "batch": batch,
+        "total_batches": total_batches,
+        "data": results
+    }
 
 # =========================
 # GLOBAL DATA (VERY IMPORTANT)

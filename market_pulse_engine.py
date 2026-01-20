@@ -91,3 +91,35 @@ def process_stock(symbol, data):
         "pulse": pulse,
         "time": datetime.now().strftime("%H:%M")
     }
+def morning_momentum(price_915, price_now):
+    return round(((price_now - price_915) / price_915) * 100, 2)
+def gap_type(prev_close, today_open):
+    gap = ((today_open - prev_close) / prev_close) * 100
+    if gap > 0.8:
+        return "GAP_UP"
+    elif gap < -0.8:
+        return "GAP_DOWN"
+    return "NO_GAP"
+def range_breakout(last_price, high_20, low_20):
+    if last_price > high_20:
+        return "BREAKOUT"
+    if last_price < low_20:
+        return "BREAKDOWN"
+    return "RANGE"
+pulse_score = 0
+
+if signal == "BULL":
+    pulse_score += 1
+if vwap_delta > 0:
+    pulse_score += 1
+if imbalance > 0:
+    pulse_score += 1
+if breakout == "BREAKOUT":
+    pulse_score += 1
+if morning_momo > 1:
+    pulse_score += 1
+pulse = (
+    "STRONG" if pulse_score >= 4 else
+    "MEDIUM" if pulse_score >= 2 else
+    "WEAK"
+)
