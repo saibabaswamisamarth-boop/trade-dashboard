@@ -1,3 +1,5 @@
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
 from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse
 from dhanhq import dhanhq
@@ -7,7 +9,8 @@ from market_pulse_engine import process_stock
 from stocks_master import FO_STOCKS
 print("Total stocks loaded:", len(FO_STOCKS))
 
-app = FastAPI()
+app = FastAPI()templates = Jinja2Templates(directory="templates")
+
 # =========================
 # MARKET PULSE V2 API
 # =========================
@@ -173,28 +176,12 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
 # =========================
 
 @app.get("/fo-dashboard", response_class=HTMLResponse)
-def fo_dashboard():
-    with open("templates/fo_dashboard.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+def fo_dashboard(request: Request):
+    return templates.TemplateResponse(
+        "fo_dashboard.html",
+        {"request": request}
+    )
 
-    return """
-<!DOCTYPE html>
-<html>
-<head>
-<title>F&O Live Scanner</title>
-<meta http-equiv="refresh" content="10">
-<style>
-body { background:#0b1220; color:#e5e7eb; font-family: Arial; }
-table { width:100%; border-collapse:collapse; }
-th,td { padding:12px; border-bottom:1px solid #1f2937; text-align:center; }
-th { background:#0f172a; }
-.green { background:#064e3b; color:#34d399; padding:4px 12px; border-radius:20px; }
-.yellow { background:#78350f; color:#facc15; padding:4px 12px; border-radius:20px; }
-</style>
-</head>
-<body>
-<h1 style="text-align:center;">🔥 F&O Live Market Pulse</h1>
-<table id="tbl"></table>
 
 <script>
 let batch = 1;
