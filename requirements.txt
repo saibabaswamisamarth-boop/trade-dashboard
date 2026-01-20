@@ -1,5 +1,4 @@
 fastapi
 uvicorn
-dhanhq
-requests
 jinja2
+dhanhq
