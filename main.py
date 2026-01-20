@@ -102,15 +102,18 @@ def market_pulse():
         }
     ]
 
-@app.get("/pro-dashboard", response_class=HTMLResponse)
-def pro_dashboard():
-    return """
-    <html>
-      <body style="background:black;color:white;text-align:center;">
-        <h1>Render Deployment Successful 🎉</h1>
-      </body>
-    </html>
-    """
+@from fastapi import Request
+from fastapi.templating import Jinja2Templates
+
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/fo-dashboard", response_class=HTMLResponse)
+def fo_dashboard(request: Request):
+    return templates.TemplateResponse(
+        "fo_dashboard.html",
+        {"request": request}
+    )
+
 
 # =========================
 # F&O LIVE SCAN
