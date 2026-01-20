@@ -3,6 +3,9 @@ from fastapi.responses import HTMLResponse
 from dhanhq import dhanhq
 import os
 
+from stocks_master import FO_STOCKS
+print("Total stocks loaded:", len(FO_STOCKS))
+
 app = FastAPI()
 
 # =========================
