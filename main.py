@@ -81,11 +81,27 @@ def market_pulse_v2(batch: int = Query(1, ge=1)):
         except Exception as e:
             print(symbol, e)
 
+    # 🔥 TOP LOGIC: SORT BY PRIORITY (VERY IMPORTANT)
+    results = sorted(
+        results,
+        key=lambda x: (
+            x.get("pulse_score", 0),   # Boost Score
+            x.get("r_factor", 0),      # Liquidity
+            x.get("volume", 0)         # Volume
+        ),
+        reverse=True
+    )
+
+    # 🔥 ONLY TOP 10 STOCKS (optional पण BEST)
+    results = results[:10]
+
     return {
         "batch": batch,
         "total_batches": total_batches,
         "data": results
     }
+
+
 
 # =========================
 # DASHBOARD (HTML)
