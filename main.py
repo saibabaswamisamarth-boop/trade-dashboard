@@ -92,46 +92,45 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
     current_batch = batches[batch - 1]
 
     for symbol, sid in current_batch:
-    try:
-        quote = dhan.quote_data(
-            securities={"NSE_EQ": [sid]}
-        )
+        try:
+            quote = dhan.quote_data(
+                securities={"NSE_EQ": [sid]}
+            )
 
-        nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
-        if str(sid) not in nse:
-            continue
+            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
+            if str(sid) not in nse:
+                continue
 
-        data = nse[str(sid)]
-        ohlc = data.get("ohlc", {})
+            data = nse[str(sid)]
+            ohlc = data.get("ohlc", {})
 
-        last_price = data.get("last_price", 0)
-        volume = data.get("volume", 0)
-        avg_price = data.get("average_price", last_price)
-        open_price = ohlc.get("open", last_price)
+            last_price = data.get("last_price", 0)
+            volume = data.get("volume", 0)
+            avg_price = data.get("average_price", last_price)
+            open_price = ohlc.get("open", last_price)
 
-        score = 0
-        if last_price > open_price:
-            score += 1
-        if last_price > avg_price:
-            score += 1
+            score = 0
+            if last_price > open_price:
+                score += 1
+            if last_price > avg_price:
+                score += 1
 
-        results.append({
-            "symbol": symbol,
-            "last_price": last_price,
-            "volume": volume,
-            "score": score
-        })
+            results.append({
+                "symbol": symbol,
+                "last_price": last_price,
+                "volume": volume,
+                "score": score
+            })
 
-    except Exception as e:
-        print(f"{symbol} error:", e)
-
-
+        except Exception as e:
+            print(f"{symbol} error:", e)
 
     return {
         "batch": batch,
         "total_batches": total_batches,
         "data": results
     }
+
 
 # =========================
 # DASHBOARD UI
