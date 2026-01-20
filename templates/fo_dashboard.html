@@ -1,51 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Trade Dashboard</title>
-  <style>
-    body {
-      background: #0f172a;
-      color: #e5e7eb;
-      font-family: Arial;
-    }
-    h1 {
-      color: #22c55e;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    th, td {
-      padding: 10px;
-      border-bottom: 1px solid #334155;
-      text-align: center;
-    }
-    th {
-      background: #020617;
-    }
-    .pulse {
-      color: #22c55e;
-      font-weight: bold;
-    }
-  </style>
-</head>
-<body>
-
-<h1>📈 Market Pulse Dashboard</h1>
-
-<table>
-  <thead>
-    <tr>
-      <th>Symbol</th>
-      <th>Price</th>
-      <th>Volume</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody id="data"></tbody>
-</table>
-
 <script>
 let batch = 1;
 
@@ -54,17 +6,7 @@ async function loadData() {
     const r = await fetch(`/market-pulse-v2?batch=${batch}`);
     const res = await r.json();
 
-    let rows = `
-      <tr>
-        <th>Symbol</th>
-        <th>Signal</th>
-        <th>% Change</th>
-        <th>VWAP Δ</th>
-        <th>Imbalance</th>
-        <th>R-Factor</th>
-        <th>Pulse</th>
-      </tr>
-    `;
+    let rows = "";
 
     res.data.forEach(x => {
       let pulseBadge =
@@ -85,7 +27,7 @@ async function loadData() {
       `;
     });
 
-    document.getElementById("tbl").innerHTML = rows;
+    document.getElementById("data").innerHTML = rows;
 
     batch++;
     if (batch > res.total_batches) batch = 1;
@@ -98,7 +40,3 @@ async function loadData() {
 loadData();
 setInterval(loadData, 10000);
 </script>
-
-
-
-
