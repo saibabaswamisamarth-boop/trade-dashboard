@@ -1,84 +1,98 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Dashboard Test</title>
+  <title>Market Pulse Dashboard</title>
   <style>
-    body { background:#0f172a; color:white; font-family:Arial; }
+    body {
+      background:#0f172a;
+      color:white;
+      font-family:Arial;
+      padding:20px;
+    }
+    h1 {
+      color:#22c55e;
+    }
+    table {
+      width:100%;
+      border-collapse:collapse;
+      margin-top:20px;
+    }
+    th, td {
+      padding:10px;
+      border-bottom:1px solid #334155;
+      text-align:center;
+    }
+    th {
+      background:#020617;
+    }
+    tr:hover {
+      background:#020617;
+    }
   </style>
 </head>
 <body>
 
-<h1>✅ Dashboard Loaded</h1>
-<p>If you see this, HTML rendering is OK.</p>
+<h1>📈 Market Pulse – Intraday Boost</h1>
+
+<table id="tbl">
+  <tr>
+    <th>Symbol</th>
+    <th>Boost Score</th>
+    <th>R-Factor</th>
+    <th>Signal</th>
+    <th>Chart</th>
+  </tr>
+</table>
+
 <script>
 async function loadData() {
   try {
     const r = await fetch("/market-pulse-v2");
     const res = await r.json();
 
-    let html = `
-      <table style="width:100%;border-collapse:collapse;margin-top:20px">
-        <tr style="background:#020617">
-          <tr>
-  <th>Symbol</th>
-  <th>Boost Score</th>
-  <th>R-Factor</th>
-  <th>Signal</th>
-  <th>Chart</th>
-</tr>
-html += `
-<tr>
-  <td>${x.symbol}</td>
-
-  <td>
-    <b>${x.boost_score ?? x.pulse_score ?? "-"}</b>
-  </td>
-
-  <td>${x.r_factor}</td>
-
-  <td>
-    ${x.signal === "BULL"
-      ? "<span style='color:#22c55e;font-weight:bold'>BULL</span>"
-      : "<span style='color:#ef4444;font-weight:bold'>BEAR</span>"}
-  </td>
-
-  <td>
-    <a href="https://www.tradingview.com/chart/?symbol=NSE:${x.symbol}"
-       target="_blank"
-       style="color:#38bdf8;text-decoration:none;font-weight:bold;">
-       📈 View
-    </a>
-  </td>
-</tr>
-`;
-
+    let rows = `
+      <tr>
+        <th>Symbol</th>
+        <th>Boost Score</th>
+        <th>R-Factor</th>
+        <th>Signal</th>
+        <th>Chart</th>
+      </tr>
     `;
 
     res.data.forEach(x => {
-      let pulse =
-        x.pulse === "STRONG" ? "🟢 STRONG" :
-        x.pulse === "MEDIUM" ? "🟡 MEDIUM" :
-        "🔴 WEAK";
-
-      html += `
+      rows += `
         <tr>
           <td>${x.symbol}</td>
-          <td>${x.signal}</td>
-          <td>${x.price_change_pct}%</td>
-          <td>${x.vwap_delta}</td>
-          <td>${x.imbalance}</td>
+
+          <td>
+            <b>${x.boost_score ?? x.pulse_score ?? "-"}</b>
+          </td>
+
           <td>${x.r_factor}</td>
-          <td>${pulse}</td>
+
+          <td>
+            ${x.signal === "BULL"
+              ? "<span style='color:#22c55e;font-weight:bold'>BULL</span>"
+              : "<span style='color:#ef4444;font-weight:bold'>BEAR</span>"}
+          </td>
+
+          <td>
+            <a href="https://www.tradingview.com/chart/?symbol=NSE:${x.symbol}"
+               target="_blank"
+               style="color:#38bdf8;text-decoration:none;font-weight:bold;">
+               📈 View
+            </a>
+          </td>
         </tr>
       `;
     });
 
-    html += "</table>";
-
-    document.body.innerHTML += html;
+    document.getElementById("tbl").innerHTML = rows;
 
   } catch (e) {
-    document.body.innerHTML += "<p style='color:red'>JS ERROR: " + e + "</p>";
+    document.body.innerHTML +=
+      "<p style='color:red'>JS ERROR: " + e + "</p>";
   }
 }
 
@@ -87,5 +101,3 @@ loadData();
 
 </body>
 </html>
-
-
