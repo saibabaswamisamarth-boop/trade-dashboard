@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from dhanhq import dhanhq
 import os
+from engines.intraday_boost_engine import process_intraday_boost
 
 from market_pulse_engine import process_stock
 from stocks_master import FO_STOCKS
@@ -113,3 +114,67 @@ def fo_dashboard(request: Request):
         "fo_dashboard.html",
         {"request": request}
     )
+@app.get("/intraday-boost")
+def intraday_boost(batch: int = Query(1, ge=1)):
+
+    dhan = get_dhan_client()
+    results = []
+
+    batches = get_batches(FO_STOCKS_FULL)
+    total_batches = len(batches)
+
+    if batch > total_batches:
+        return {
+            "batch": batch,
+            "total_batches": total_batches,
+            "data": []
+        }
+
+    current_batch = batches[batch - 1]
+
+    # 🔹 INDEX MOVE PROXY (simple)
+    index_move_pct = 0  # future: live NIFTY %
+
+    for symbol, sid in current_batch:
+        try:
+            quote = dhan.quote_data(
+                securities={"NSE_EQ": [sid]}
+            )
+
+            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
+            if str(sid) not in nse:
+                continue
+
+            data = nse[str(sid)]
+
+            # 🔥 INTRADAY BOOST ENGINE CALL
+            result = process_intraday_boost(
+                symbol=symbol,
+                data=data,
+                index_move_pct=index_move_pct
+            )
+
+            results.append(result)
+
+        except Exception as e:
+            print(symbol, e)
+
+    # 🔥 SORT BY BOOST SCORE (MOST IMPORTANT)
+    results = sorted(
+        results,
+        key=lambda x: (
+            x.get("boost_score", 0),
+            x.get("r_factor", 0),
+            x.get("volume", 0)
+        ),
+        reverse=True
+    )
+
+    # 🔥 ONLY TOP 10 STOCKS
+    results = results[:10]
+
+    return {
+        "batch": batch,
+        "total_batches": total_batches,
+        "data": results
+    }
