@@ -46,51 +46,59 @@
   <tbody id="data"></tbody>
 </table>
 
-<table id="tbl"></table>
-
 <script>
 let batch = 1;
 
 async function loadData() {
-  const r = await fetch(`/market-pulse-v2?batch=${batch}`);
-  const res = await r.json();
+  try {
+    const r = await fetch(`/market-pulse-v2?batch=${batch}`);
+    const res = await r.json();
 
-  let rows = `
-    <tr>
-      <th>Symbol</th>
-      <th>Signal</th>
-      <th>% Change</th>
-      <th>VWAP Δ</th>
-      <th>Imbalance</th>
-      <th>R-Factor</th>
-      <th>Pulse</th>
-      <th>Time</th>
-    </tr>
-  `;
-
-  res.data.forEach(x => {
-    rows += `
+    let rows = `
       <tr>
-        <td>${x.symbol}</td>
-        <td>${x.signal}</td>
-        <td>${x.price_change_pct}%</td>
-        <td>${x.vwap_delta}</td>
-        <td>${x.imbalance}</td>
-        <td>${x.r_factor}</td>
-        <td>${x.pulse}</td>
-        <td>${x.time}</td>
+        <th>Symbol</th>
+        <th>Signal</th>
+        <th>% Change</th>
+        <th>VWAP Δ</th>
+        <th>Imbalance</th>
+        <th>R-Factor</th>
+        <th>Pulse</th>
       </tr>
     `;
-  });
 
-  document.getElementById("tbl").innerHTML = rows;
+    res.data.forEach(x => {
+      let pulseBadge =
+        x.pulse === "STRONG" ? "🟢 STRONG" :
+        x.pulse === "MEDIUM" ? "🟡 MEDIUM" :
+        "🔴 WEAK";
 
-  batch++;
-  if (batch > res.total_batches) batch = 1;
+      rows += `
+        <tr>
+          <td>${x.symbol}</td>
+          <td>${x.signal}</td>
+          <td>${x.price_change_pct}%</td>
+          <td>${x.vwap_delta}</td>
+          <td>${x.imbalance}</td>
+          <td>${x.r_factor}</td>
+          <td>${pulseBadge}</td>
+        </tr>
+      `;
+    });
+
+    document.getElementById("tbl").innerHTML = rows;
+
+    batch++;
+    if (batch > res.total_batches) batch = 1;
+
+  } catch (err) {
+    console.error("Dashboard error:", err);
+  }
 }
 
 loadData();
 setInterval(loadData, 10000);
 </script>
+
+
 
 
