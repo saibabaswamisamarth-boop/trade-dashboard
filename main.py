@@ -5,7 +5,8 @@ from dhanhq import dhanhq
 import os
 from engines.intraday_boost_engine import process_intraday_boost
 
-from market_pulse_engine import process_stock
+from engines.market_pulse_engine import process_stock
+from engines.intraday_boost_engine import process_intraday_boost
 from stocks_master import FO_STOCKS
 
 print("Total stocks loaded:", len(FO_STOCKS))
