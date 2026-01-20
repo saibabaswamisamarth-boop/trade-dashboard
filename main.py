@@ -126,6 +126,7 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
         print(f"{symbol} error:", e)
 
 
+
     return {
         "batch": batch,
         "total_batches": total_batches,
