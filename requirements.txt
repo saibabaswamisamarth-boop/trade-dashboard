@@ -2,3 +2,4 @@ fastapi
 uvicorn
 dhanhq
 requests
+jinja2
