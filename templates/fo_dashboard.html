@@ -1,44 +1,15 @@
-<script>
-let batch = 1;
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dashboard Test</title>
+  <style>
+    body { background:#0f172a; color:white; font-family:Arial; }
+  </style>
+</head>
+<body>
 
-async function loadData() {
-  try {
-    const r = await fetch(`https://trade-dashboard-dm3w.onrender.com/market-pulse-v2?batch=${batch}`);
+<h1>✅ Dashboard Loaded</h1>
+<p>If you see this, HTML rendering is OK.</p>
 
-    const res = await r.json();
-
-    let rows = "";
-
-    res.data.forEach(x => {
-      let pulseBadge =
-        x.pulse === "STRONG" ? "🟢 STRONG" :
-        x.pulse === "MEDIUM" ? "🟡 MEDIUM" :
-        "🔴 WEAK";
-
-      rows += `
-        <tr>
-          <td>${x.symbol}</td>
-          <td>${x.signal}</td>
-          <td>${x.price_change_pct}%</td>
-          <td>${x.vwap_delta}</td>
-          <td>${x.imbalance}</td>
-          <td>${x.r_factor}</td>
-          <td>${pulseBadge}</td>
-        </tr>
-      `;
-    });
-
-    document.getElementById("data").innerHTML = rows;
-
-    batch++;
-    if (batch > res.total_batches) batch = 1;
-
-  } catch (err) {
-    console.error("Dashboard error:", err);
-  }
-}
-
-loadData();
-setInterval(loadData, 10000);
-</script>
-
+</body>
+</html>
