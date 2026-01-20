@@ -174,6 +174,9 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
 
 @app.get("/fo-dashboard", response_class=HTMLResponse)
 def fo_dashboard():
+    with open("templates/fo_dashboard.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
+
     return """
 <!DOCTYPE html>
 <html>
