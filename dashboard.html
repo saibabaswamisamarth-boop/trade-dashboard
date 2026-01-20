@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Trade Dashboard</title>
+  <style>
+    body {
+      background: #0f172a;
+      color: #e5e7eb;
+      font-family: Arial;
+    }
+    h1 {
+      color: #22c55e;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #334155;
+      text-align: center;
+    }
+    th {
+      background: #020617;
+    }
+    .pulse {
+      color: #22c55e;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<h1>📈 Market Pulse Dashboard</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Symbol</th>
+      <th>Price</th>
+      <th>Volume</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody id="data"></tbody>
+</table>
+
+<script>
+async function loadData() {
+  const res = await fetch("http://127.0.0.1:8000/scan-market-pulse");
+  const data = await res.json();
+
+  const table = document.getElementById("data");
+  table.innerHTML = "";
+
+  data.forEach(stock => {
+    table.innerHTML += `
+      <tr>
+        <td>${stock.symbol}</td>
+        <td>${stock.last_price}</td>
+        <td>${stock.volume}</td>
+        <td class="pulse">ACTIVE</td>
+      </tr>
+    `;
+  });
+}
+
+loadData();
+setInterval(loadData, 10000); // auto refresh 10 sec
+</script>
+
+</body>
+</html>
+rows += `
+<tr>
+  <td>${x.symbol}</td>
+  <td>${x.signal}</td>
+  <td>${x.price_change_pct}%</td>
+  <td>${x.vwap_delta}</td>
+  <td>${x.imbalance}</td>
+  <td>${x.r_factor}</td>
+  <td>${x.pulse}</td>
+</tr>
+`;

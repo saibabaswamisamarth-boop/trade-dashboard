@@ -19,11 +19,6 @@ def market_pulse_v2(batch: int = Query(1, ge=1)):
     results = []
 
     batches = get_batches(FO_STOCKS_FULL)
-    total_batches = len(batches)
-
-    if batch > total_batches:
-        return {"batch": batch, "total_batches": total_batches, "data": []}
-
     current_batch = batches[batch - 1]
 
     for symbol, sid in current_batch:
@@ -37,8 +32,6 @@ def market_pulse_v2(batch: int = Query(1, ge=1)):
                 continue
 
             data = nse[str(sid)]
-
-            # 🔥 ENGINE CALL
             result = process_stock(symbol, data)
             results.append(result)
 
@@ -47,7 +40,7 @@ def market_pulse_v2(batch: int = Query(1, ge=1)):
 
     return {
         "batch": batch,
-        "total_batches": total_batches,
+        "total_batches": len(batches),
         "data": results
     }
 
@@ -203,8 +196,10 @@ th { background:#0f172a; }
 <script>
 let batch = 1;
 async function loadData(){
-  const r = await fetch(`/fo-live-scan?batch=${batch}`);
+  const r = await fetch(`/market-pulse-v2?batch=${batch}`);
   const res = await r.json();
+  const data = res.data;
+
   let rows = `
     <tr><th>Symbol</th><th>Price</th><th>Volume</th><th>Strength</th></tr>
   `;
