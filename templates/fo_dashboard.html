@@ -46,40 +46,51 @@
   <tbody id="data"></tbody>
 </table>
 
+<table id="tbl"></table>
+
 <script>
+let batch = 1;
+
 async function loadData() {
-  const res = await fetch("http://127.0.0.1:8000/scan-market-pulse");
-  const data = await res.json();
+  const r = await fetch(`/market-pulse-v2?batch=${batch}`);
+  const res = await r.json();
 
-  const table = document.getElementById("data");
-  table.innerHTML = "";
+  let rows = `
+    <tr>
+      <th>Symbol</th>
+      <th>Signal</th>
+      <th>% Change</th>
+      <th>VWAP Δ</th>
+      <th>Imbalance</th>
+      <th>R-Factor</th>
+      <th>Pulse</th>
+      <th>Time</th>
+    </tr>
+  `;
 
-  data.forEach(stock => {
-    table.innerHTML += `
+  res.data.forEach(x => {
+    rows += `
       <tr>
-        <td>${stock.symbol}</td>
-        <td>${stock.last_price}</td>
-        <td>${stock.volume}</td>
-        <td class="pulse">ACTIVE</td>
+        <td>${x.symbol}</td>
+        <td>${x.signal}</td>
+        <td>${x.price_change_pct}%</td>
+        <td>${x.vwap_delta}</td>
+        <td>${x.imbalance}</td>
+        <td>${x.r_factor}</td>
+        <td>${x.pulse}</td>
+        <td>${x.time}</td>
       </tr>
     `;
   });
+
+  document.getElementById("tbl").innerHTML = rows;
+
+  batch++;
+  if (batch > res.total_batches) batch = 1;
 }
 
 loadData();
-setInterval(loadData, 10000); // auto refresh 10 sec
+setInterval(loadData, 10000);
 </script>
 
-</body>
-</html>
-rows += `
-<tr>
-  <td>${x.symbol}</td>
-  <td>${x.signal}</td>
-  <td>${x.price_change_pct}%</td>
-  <td>${x.vwap_delta}</td>
-  <td>${x.imbalance}</td>
-  <td>${x.r_factor}</td>
-  <td>${x.pulse}</td>
-</tr>
-`;
+
