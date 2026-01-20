@@ -10,6 +10,56 @@
 
 <h1>✅ Dashboard Loaded</h1>
 <p>If you see this, HTML rendering is OK.</p>
+<script>
+async function loadData() {
+  try {
+    const r = await fetch("/market-pulse-v2");
+    const res = await r.json();
+
+    let html = `
+      <table style="width:100%;border-collapse:collapse;margin-top:20px">
+        <tr style="background:#020617">
+          <th>Symbol</th>
+          <th>Signal</th>
+          <th>% Change</th>
+          <th>VWAP Δ</th>
+          <th>Imbalance</th>
+          <th>R-Factor</th>
+          <th>Pulse</th>
+        </tr>
+    `;
+
+    res.data.forEach(x => {
+      let pulse =
+        x.pulse === "STRONG" ? "🟢 STRONG" :
+        x.pulse === "MEDIUM" ? "🟡 MEDIUM" :
+        "🔴 WEAK";
+
+      html += `
+        <tr>
+          <td>${x.symbol}</td>
+          <td>${x.signal}</td>
+          <td>${x.price_change_pct}%</td>
+          <td>${x.vwap_delta}</td>
+          <td>${x.imbalance}</td>
+          <td>${x.r_factor}</td>
+          <td>${pulse}</td>
+        </tr>
+      `;
+    });
+
+    html += "</table>";
+
+    document.body.innerHTML += html;
+
+  } catch (e) {
+    document.body.innerHTML += "<p style='color:red'>JS ERROR: " + e + "</p>";
+  }
+}
+
+loadData();
+</script>
 
 </body>
 </html>
+
