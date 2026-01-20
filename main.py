@@ -101,21 +101,26 @@ def fo_live_scan(batch: int = Query(1, ge=1)):
             data = nse[str(sid)]
             ohlc = data.get("ohlc", {})
 
-            last_price = data.get("last_price", 0)
-            volume = data.get("volume", 0)
-            avg_price = data.get("average_price", last_price)
+last_price = data.get("last_price", 0)
+volume = data.get("volume", 0)
+avg_price = data.get("average_price", last_price)
 
-            score = 0
-            score += last_price > ohlc.get("open", 0)
-            score += last_price > avg_price
+open_price = ohlc.get("open", last_price)
 
-            if score >= 1:
-                results.append({
-                    "symbol": symbol,
-                    "last_price": last_price,
-                    "volume": volume,
-                    "score": score
-                })
+score = 0
+if last_price > open_price:
+    score += 1
+if last_price > avg_price:
+    score += 1
+
+
+            results.append({
+    "symbol": symbol,
+    "last_price": last_price,
+    "volume": volume,
+    "score": score
+})
+
 
         except Exception as e:
             print(symbol, e)
