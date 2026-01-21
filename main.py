@@ -54,7 +54,7 @@ def update_day_memory(symbol, score):
     if score > mem["score"]:
         score += 2
 
-    if (now - mem["first_seen"]).seconds >= 1800:  # 30 min
+    if (now - mem["first_seen"]).seconds >= 1800:  # 30 min persistence
         score += 3
 
     mem["score"] = score
@@ -136,7 +136,7 @@ def health():
 def intraday_boost(batch: int = Query(1, ge=1)):
     global CACHED_RESPONSE
 
-    # ⚡ CACHE HIT
+    # ⚡ CACHE HIT (speed)
     if not should_run_engine() and CACHED_RESPONSE:
         return CACHED_RESPONSE
 
@@ -150,10 +150,13 @@ def intraday_boost(batch: int = Query(1, ge=1)):
     total_batches = len(batches)
 
     if batch > total_batches:
-        return {"data": {"candidates": [], "boosted": []}}
+        return {
+            "generated_at": datetime.now().strftime("%H:%M:%S"),
+            "data": {"candidates": [], "boosted": []}
+        }
 
     current_batch = batches[batch - 1]
-    index_move_pct = 0
+    index_move_pct = 0  # future use
 
     for symbol, sid in current_batch:
         try:
@@ -177,6 +180,7 @@ def intraday_boost(batch: int = Query(1, ge=1)):
             result["boost_score"] = final_score
             result["signal"] = elite_signal(final_score)
 
+            # LEFT / RIGHT SPLIT
             if final_score >= 10:
                 boosted.append(result)
             else:
@@ -185,16 +189,18 @@ def intraday_boost(batch: int = Query(1, ge=1)):
         except Exception as e:
             print("ERROR:", symbol, e)
 
-    # 🔒 SORT + LIMIT
+    # 🔒 SORT + TOP 10
     boosted = sorted(boosted, key=lambda x: x["boost_score"], reverse=True)[:10]
     candidates = sorted(candidates, key=lambda x: x["boost_score"], reverse=True)[:10]
 
-    # 📌 MARKET CLOSE SNAPSHOT
+    # 📌 MARKET CLOSE SNAPSHOT (IMPORTANT FIX)
     if is_market_closed():
         if not DAY_STATE["snapshot_saved"]:
             DAY_STATE["final_snapshot"] = boosted
             DAY_STATE["snapshot_saved"] = True
+
         boosted = DAY_STATE["final_snapshot"]
+        candidates = []  # market close ला breakout box empty
 
     CACHED_RESPONSE = {
         "generated_at": datetime.now().strftime("%H:%M:%S"),
