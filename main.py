@@ -122,10 +122,14 @@ def market_pulse_v2(batch: int = Query(1, ge=1)):
 
 @app.get("/fo-dashboard", response_class=HTMLResponse)
 def fo_dashboard(request: Request):
+    @app.get("/fo-dashboard", response_class=HTMLResponse)
+def fo_dashboard(request: Request):
     return templates.TemplateResponse(
-        "fo_dashboard.html",
+        "dashboard.html",
         {"request": request}
     )
+
+
 @app.get("/intraday-boost")
 def intraday_boost(batch: int = Query(1, ge=1)):
 
@@ -200,4 +204,39 @@ def intraday_boost(batch: int = Query(1, ge=1)):
         "total_batches": total_batches,
         "data": data
     }
+@app.get("/api/market-heat")
+def market_heat(batch: int = Query(1, ge=1)):
+    dhan = get_dhan_client()
+    results = []
+
+    batches = get_batches(FO_STOCKS_FULL)
+    current_batch = batches[batch - 1]
+
+    for symbol, sid in current_batch:
+        try:
+            quote = dhan.quote_data(securities={"NSE_EQ": [sid]})
+            data = quote["data"]["data"]["NSE_EQ"].get(str(sid))
+            if not data:
+                continue
+
+            r_factor = round(data.get("volume", 0) / 1_000_000, 2)
+            pct = ((data["last_price"] - data["ohlc"]["open"]) / data["ohlc"]["open"]) * 100
+
+            results.append({
+                "symbol": symbol,
+                "pct": round(pct, 2),
+                "r_factor": r_factor,
+                "signal": "UP" if pct > 0 else "DOWN"
+            })
+        except:
+            pass
+
+    # 🔥 SCANNER SORT
+    results = sorted(
+        results,
+        key=lambda x: (abs(x["pct"]), x["r_factor"]),
+        reverse=True
+    )[:10]
+
+    return {"data": results}
 
