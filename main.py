@@ -3,56 +3,36 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from dhanhq import dhanhq
 import os
-from engines.intraday_boost_engine import process_intraday_boost
 
 from engines.market_pulse_engine import process_stock
 from engines.intraday_boost_engine import process_intraday_boost
 from stocks_master import FO_STOCKS
 
-print("Total stocks loaded:", len(FO_STOCKS))
-
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# =========================
-# GLOBAL DATA
-# =========================
-
 FO_STOCKS_FULL = FO_STOCKS
-BATCH_SIZE = 15
+BATCH_SIZE = 200
 
 def get_batches(stock_dict):
     items = list(stock_dict.items())
-    return [items[i:i + BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
-
-# =========================
-# DHAN CLIENT
-# =========================
+    return [items[i:i+BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
 
 def get_dhan_client():
-    client_id = os.getenv("CLIENT_ID")
-    access_token = os.getenv("ACCESS_TOKEN")
-
-    if not client_id or not access_token:
-        raise Exception("Dhan ENV variables not set")
-
-    return dhanhq(client_id, access_token)
-
-# =========================
-# BASIC ROUTES
-# =========================
+    return dhanhq(
+        os.getenv("CLIENT_ID"),
+        os.getenv("ACCESS_TOKEN")
+    )
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 # =========================
-# MARKET PULSE V2 API
+# MARKET PULSE (RAW – ALL STOCKS)
 # =========================
-
 @app.get("/market-pulse-v2")
 def market_pulse_v2(batch: int = Query(1, ge=1)):
-
     dhan = get_dhan_client()
     results = []
 
@@ -62,40 +42,16 @@ def market_pulse_v2(batch: int = Query(1, ge=1)):
     if batch > total_batches:
         return {"batch": batch, "total_batches": total_batches, "data": []}
 
-    current_batch = batches[batch - 1]
-
-    for symbol, sid in current_batch:
+    for symbol, sid in batches[batch - 1]:
         try:
-            quote = dhan.quote_data(
-                securities={"NSE_EQ": [sid]}
-            )
-
-            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
-            if str(sid) not in nse:
+            q = dhan.quote_data(securities={"NSE_EQ": [sid]})
+            data = q.get("data", {}).get("data", {}).get("NSE_EQ", {}).get(str(sid))
+            if not data:
                 continue
 
-            data = nse[str(sid)]
-
-            # 🔥 CORE ENGINE
-            result = process_stock(symbol, data)
-            results.append(result)
-
-        except Exception as e:
-            print(symbol, e)
-
-    # 🔥 TOP STOCK SELECTION (INSIDE FUNCTION)
-    results = sorted(
-        results,
-        key=lambda x: (
-            x.get("pulse_score", 0),
-            x.get("r_factor", 0),
-            x.get("volume", 0)
-        ),
-        reverse=True
-    )
-
-    # 👉 फक्त TOP 10
-    results = results[:10]
+            results.append(process_stock(symbol, data))
+        except:
+            pass
 
     return {
         "batch": batch,
@@ -103,22 +59,11 @@ def market_pulse_v2(batch: int = Query(1, ge=1)):
         "data": results
     }
 
-
-
-
 # =========================
-# DASHBOARD (HTML)
+# INTRADAY BOOST (TOP STOCKS)
 # =========================
-
-@app.get("/fo-dashboard", response_class=HTMLResponse)
-def fo_dashboard(request: Request):
-    return templates.TemplateResponse(
-        "fo_dashboard.html",
-        {"request": request}
-    )
 @app.get("/intraday-boost")
 def intraday_boost(batch: int = Query(1, ge=1)):
-
     dhan = get_dhan_client()
     results = []
 
@@ -126,57 +71,36 @@ def intraday_boost(batch: int = Query(1, ge=1)):
     total_batches = len(batches)
 
     if batch > total_batches:
-        return {
-            "batch": batch,
-            "total_batches": total_batches,
-            "data": []
-        }
+        return {"batch": batch, "total_batches": total_batches, "data": []}
 
-    current_batch = batches[batch - 1]
-
-    # 🔹 INDEX MOVE PROXY (simple)
-    index_move_pct = 0  # future: live NIFTY %
-
-    for symbol, sid in current_batch:
+    for symbol, sid in batches[batch - 1]:
         try:
-            quote = dhan.quote_data(
-                securities={"NSE_EQ": [sid]}
-            )
-
-            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
-            if str(sid) not in nse:
+            q = dhan.quote_data(securities={"NSE_EQ": [sid]})
+            data = q.get("data", {}).get("data", {}).get("NSE_EQ", {}).get(str(sid))
+            if not data:
                 continue
 
-            data = nse[str(sid)]
-
-            # 🔥 INTRADAY BOOST ENGINE CALL
-            result = process_intraday_boost(
-                symbol=symbol,
-                data=data,
-                index_move_pct=index_move_pct
+            results.append(
+                process_intraday_boost(symbol, data, index_move_pct=0)
             )
+        except:
+            pass
 
-            results.append(result)
-
-        except Exception as e:
-            print(symbol, e)
-
-    # 🔥 SORT BY BOOST SCORE (MOST IMPORTANT)
     results = sorted(
         results,
-        key=lambda x: (
-            x.get("boost_score", 0),
-            x.get("r_factor", 0),
-            x.get("volume", 0)
-        ),
+        key=lambda x: (x["boost_score"], x["r_factor"]),
         reverse=True
     )
-
-    # 🔥 ONLY TOP 10 STOCKS
-    results = results[:10]
 
     return {
         "batch": batch,
         "total_batches": total_batches,
-        "data": results
+        "data": results[:20]   # TOP 20 (change as needed)
     }
+
+@app.get("/fo-dashboard", response_class=HTMLResponse)
+def fo_dashboard(request: Request):
+    return templates.TemplateResponse(
+        "fo_dashboard.html",
+        {"request": request}
+    )
