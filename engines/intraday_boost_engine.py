@@ -159,3 +159,19 @@ def process_intraday_boost(symbol, data, index_move_pct=0):
         "notes": ",".join(notes),
         "time": now
     }
+if abs(index_move_pct) < 0.3:
+    market_mode = "SIDEWAYS"
+else:
+    market_mode = "TRENDING"
+
+direction_ok = (
+    price_change_pct > 0.4 and
+    last_price > vwap and
+    high_5min_break == True
+)
+
+if market_mode == "SIDEWAYS":
+    r_factor_score = min(r_factor, 2)
+
+range_expansion = current_range > avg_5min_range * 1.3
+
