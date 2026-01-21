@@ -1,68 +1,6 @@
-if abs(index_move_pct) < 0.3:
-    market_mode = "SIDEWAYS"
 # engines/intraday_boost_engine.py
-
-def process_intraday_boost(symbol, data, index_move_pct=0):
-
-    last_price = data.get("last_price", 0)
-    open_price = data.get("ohlc", {}).get("open", last_price)
-    volume = data.get("volume", 0)
-    avg_price = data.get("average_price", last_price)
-
-    # ======================
-    # MARKET MODE
-    # ======================
-    if abs(index_move_pct) < 0.3:
-        market_mode = "SIDEWAYS"
-    else:
-        market_mode = "TRENDING"
-
-    # ======================
-    # BASIC CALCULATIONS
-    # ======================
-    price_change_pct = ((last_price - open_price) / open_price) * 100 if open_price else 0
-    r_factor = round(volume / 1_000_000, 2)
-
-    boost_score = 0
-
-    # ======================
-    # CORE LOGIC
-    # ======================
-
-    if price_change_pct > 0.4:
-        boost_score += 1
-
-    if last_price > avg_price:
-        boost_score += 1
-
-    if r_factor > 1.2:
-        boost_score += 1
-
-    # SIDEWAYS MARKET PROTECTION
-    if market_mode == "SIDEWAYS":
-        boost_score = min(boost_score, 3)
-
-    # FINAL FILTER
-    if boost_score < 2:
-        return None   # ❌ reject stock
-
-    signal = "BULL" if price_change_pct > 0 else "BEAR"
-
-    return {
-        "symbol": symbol,
-        "boost_score": boost_score,
-        "r_factor": r_factor,
-        "signal": signal,
-        "volume": volume
-    }
-# engines/intraday_boost_engine.py
-# ==========================================
-# INTRADAY BOOST ENGINE – 20 POINT SYSTEM
-# Trader / Smart Money Level Logic
-# ==========================================
 
 from datetime import datetime
-
 
 # -------------------------
 # HELPERS
@@ -74,7 +12,7 @@ def pct_change(a, b):
     return round(((b - a) / a) * 100, 2)
 
 
-def candle_range(o, h, l):
+def candle_range(h, l):
     return abs(h - l)
 
 
@@ -91,14 +29,6 @@ def is_power_candle(o, h, l, c):
 # -------------------------
 
 def process_intraday_boost(symbol, data, index_move_pct=0):
-    """
-    Input:
-      symbol: str
-      data: NSE_EQ quote dict (Dhan)
-      index_move_pct: NIFTY/BANKNIFTY % change (proxy)
-    Output:
-      Intraday Boost dict
-    """
 
     ohlc = data.get("ohlc", {})
     depth = data.get("depth", {})
@@ -114,21 +44,28 @@ def process_intraday_boost(symbol, data, index_move_pct=0):
     buy_qty = sum(x.get("quantity", 0) for x in depth.get("buy", []))
     sell_qty = sum(x.get("quantity", 0) for x in depth.get("sell", []))
 
+    # ======================
+    # MARKET MODE
+    # ======================
+    if abs(index_move_pct) < 0.3:
+        market_mode = "SIDEWAYS"
+    else:
+        market_mode = "TRENDING"
+
     score = 0
     notes = []
 
-    # ==========================================
-    # A. GAP FILTER (2)
-    # ==========================================
+    # ======================
+    # GAP FILTER (2)
+    # ======================
     gap_pct = pct_change(data.get("prev_close", open_p), open_p)
     if abs(gap_pct) > 0.8:
         score += 2
         notes.append("GAP")
 
-    # ==========================================
-    # B. ORB – Opening Range Breakout (2)
-    # (proxy using day high/low)
-    # ==========================================
+    # ======================
+    # ORB (2)
+    # ======================
     if close_p > high_p * 0.995:
         score += 2
         notes.append("ORB_UP")
@@ -136,76 +73,75 @@ def process_intraday_boost(symbol, data, index_move_pct=0):
         score += 2
         notes.append("ORB_DOWN")
 
-    # ==========================================
-    # C. VWAP RETEST + HOLD (2)
-    # ==========================================
+    # ======================
+    # VWAP HOLD (2)
+    # ======================
     if close_p > avg_price:
         score += 2
         notes.append("VWAP_HOLD")
 
-    # ==========================================
-    # D. POWER CANDLE – NO WICK (1)
-    # ==========================================
+    # ======================
+    # POWER CANDLE (1)
+    # ======================
     if is_power_candle(open_p, high_p, low_p, close_p):
         score += 1
-        notes.append("POWER_CANDLE")
+        notes.append("POWER")
 
-    # ==========================================
-    # E. RANGE EXPANSION (2)
-    # ==========================================
-    if candle_range(open_p, high_p, low_p) > (avg_price * 0.015):
+    # ======================
+    # RANGE EXPANSION (2)
+    # ======================
+    if candle_range(high_p, low_p) > close_p * 0.015:
         score += 2
         notes.append("RANGE_EXP")
 
-    # ==========================================
-    # F. VOLUME × RANGE (2)
-    # ==========================================
+    # ======================
+    # VOLUME SPIKE (2)
+    # ======================
     if volume > 1_500_000:
         score += 2
-        notes.append("VOLUME_SPIKE")
+        notes.append("VOLUME")
 
-    # ==========================================
-    # G. LIQUIDITY ABSORPTION (2)
-    # ==========================================
+    # ======================
+    # LIQUIDITY ABSORPTION (2)
+    # ======================
     if buy_qty > sell_qty * 1.2:
         score += 2
-        notes.append("BUY_ABSORPTION")
+        notes.append("ABSORB")
 
-    # ==========================================
-    # H. HIGHER TF ALIGNMENT (2)
-    # (proxy: price above avg)
-    # ==========================================
-    if close_p > avg_price:
-        score += 2
-        notes.append("HTF_ALIGN")
-
-    # ==========================================
-    # I. RELATIVE STRENGTH VS INDEX (2)
-    # ==========================================
+    # ======================
+    # RELATIVE STRENGTH (2)
+    # ======================
     stock_move = pct_change(open_p, close_p)
     if stock_move > index_move_pct:
         score += 2
-        notes.append("RS_STRONG")
+        notes.append("RS")
 
-    # ==========================================
-    # J. SMART MONEY TIME ZONE (1)
-    # ==========================================
+    # ======================
+    # SMART TIME (1)
+    # ======================
     now = datetime.now().strftime("%H:%M")
     if "09:20" <= now <= "10:30" or "13:45" <= now <= "14:45":
         score += 1
-        notes.append("SMART_TIME")
+        notes.append("TIME")
 
-    # ==========================================
-    # FINAL SIGNAL
-    # ==========================================
+    # ======================
+    # SIDEWAYS FILTER
+    # ======================
+    if market_mode == "SIDEWAYS":
+        score = min(score, 10)
+
+    # ======================
+    # FINAL FILTER
+    # ======================
+    if score < 7:
+        return None
+
     if score >= 15:
         signal = "ELITE"
     elif score >= 11:
         signal = "STRONG"
-    elif score >= 7:
-        signal = "WATCH"
     else:
-        signal = "IGNORE"
+        signal = "WATCH"
 
     return {
         "symbol": symbol,
@@ -214,7 +150,6 @@ def process_intraday_boost(symbol, data, index_move_pct=0):
         "r_factor": round(volume / 1_000_000, 2),
         "volume": volume,
         "notes": ",".join(notes),
+        "market_mode": market_mode,
         "time": now
     }
-
-
