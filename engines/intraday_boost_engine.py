@@ -1,3 +1,60 @@
+if abs(index_move_pct) < 0.3:
+    market_mode = "SIDEWAYS"
+# engines/intraday_boost_engine.py
+
+def process_intraday_boost(symbol, data, index_move_pct=0):
+
+    last_price = data.get("last_price", 0)
+    open_price = data.get("ohlc", {}).get("open", last_price)
+    volume = data.get("volume", 0)
+    avg_price = data.get("average_price", last_price)
+
+    # ======================
+    # MARKET MODE
+    # ======================
+    if abs(index_move_pct) < 0.3:
+        market_mode = "SIDEWAYS"
+    else:
+        market_mode = "TRENDING"
+
+    # ======================
+    # BASIC CALCULATIONS
+    # ======================
+    price_change_pct = ((last_price - open_price) / open_price) * 100 if open_price else 0
+    r_factor = round(volume / 1_000_000, 2)
+
+    boost_score = 0
+
+    # ======================
+    # CORE LOGIC
+    # ======================
+
+    if price_change_pct > 0.4:
+        boost_score += 1
+
+    if last_price > avg_price:
+        boost_score += 1
+
+    if r_factor > 1.2:
+        boost_score += 1
+
+    # SIDEWAYS MARKET PROTECTION
+    if market_mode == "SIDEWAYS":
+        boost_score = min(boost_score, 3)
+
+    # FINAL FILTER
+    if boost_score < 2:
+        return None   # ❌ reject stock
+
+    signal = "BULL" if price_change_pct > 0 else "BEAR"
+
+    return {
+        "symbol": symbol,
+        "boost_score": boost_score,
+        "r_factor": r_factor,
+        "signal": signal,
+        "volume": volume
+    }
 # engines/intraday_boost_engine.py
 # ==========================================
 # INTRADAY BOOST ENGINE – 20 POINT SYSTEM
@@ -159,19 +216,5 @@ def process_intraday_boost(symbol, data, index_move_pct=0):
         "notes": ",".join(notes),
         "time": now
     }
-if abs(index_move_pct) < 0.3:
-    market_mode = "SIDEWAYS"
-else:
-    market_mode = "TRENDING"
 
-direction_ok = (
-    price_change_pct > 0.4 and
-    last_price > vwap and
-    high_5min_break == True
-)
-
-if market_mode == "SIDEWAYS":
-    r_factor_score = min(r_factor, 2)
-
-range_expansion = current_range > avg_5min_range * 1.3
 
