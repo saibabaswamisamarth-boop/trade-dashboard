@@ -6,7 +6,10 @@ from dhanhq import dhanhq
 import os
 from datetime import datetime, date
 
-from engines.intraday_boost_engine import process_intraday_boost
+from engines.intraday_boost_engine import (
+    process_intraday_boost,
+    process_intraday_breakout
+)
 from stocks_master import FO_STOCKS
 
 # =========================
@@ -50,11 +53,9 @@ def update_day_memory(symbol, score):
 
     if mem["hits"] >= 2:
         score += 2
-
     if score > mem["score"]:
         score += 2
-
-    if (now - mem["first_seen"]).seconds >= 1800:  # 30 min persistence
+    if (now - mem["first_seen"]).seconds >= 1800:
         score += 3
 
     mem["score"] = score
@@ -83,7 +84,7 @@ def should_run_engine():
     return False
 
 # =========================
-# SIGNAL LOGIC (ELITE LEVEL)
+# SIGNAL LABEL (BOOST SIDE)
 # =========================
 
 def elite_signal(score):
@@ -97,7 +98,7 @@ def elite_signal(score):
         return "WATCH 👀"
 
 # =========================
-# GLOBAL DATA
+# STOCK BATCHING
 # =========================
 
 FO_STOCKS_FULL = FO_STOCKS
@@ -114,10 +115,8 @@ def get_batches(stock_dict):
 def get_dhan_client():
     client_id = os.getenv("CLIENT_ID")
     access_token = os.getenv("ACCESS_TOKEN")
-
     if not client_id or not access_token:
         raise Exception("Dhan ENV variables not set")
-
     return dhanhq(client_id, access_token)
 
 # =========================
@@ -129,34 +128,31 @@ def health():
     return {"status": "ok"}
 
 # =========================
-# INTRADAY BOOST API
+# INTRADAY ENGINE API
 # =========================
 
 @app.get("/intraday-boost")
 def intraday_boost(batch: int = Query(1, ge=1)):
     global CACHED_RESPONSE
 
-    # ⚡ CACHE HIT (speed)
+    # ⚡ CACHE HIT
     if not should_run_engine() and CACHED_RESPONSE:
         return CACHED_RESPONSE
 
-    print("⚙️ Running Intraday Boost Engine")
+    print("⚙️ Running Intraday Engine")
 
     dhan = get_dhan_client()
-    candidates = []
-    boosted = []
+    candidates = []   # LEFT PANEL – INTRADAY BREAKOUT
+    boosted = []      # RIGHT PANEL – INTRADAY BOOST
 
     batches = get_batches(FO_STOCKS_FULL)
     total_batches = len(batches)
 
     if batch > total_batches:
-        return {
-            "generated_at": datetime.now().strftime("%H:%M:%S"),
-            "data": {"candidates": [], "boosted": []}
-        }
+        return {"data": {"candidates": [], "boosted": []}}
 
     current_batch = batches[batch - 1]
-    index_move_pct = 0  # future use
+    index_move_pct = 0  # (future: NIFTY strength)
 
     for symbol, sid in current_batch:
         try:
@@ -167,41 +163,54 @@ def intraday_boost(batch: int = Query(1, ge=1)):
                 continue
 
             data = nse[str(sid)]
-            result = process_intraday_boost(symbol, data, index_move_pct)
 
-            if not result:
-                continue
+            # -------------------------
+            # LEFT PANEL: INTRADAY BREAKOUT
+            # -------------------------
+            breakout = process_intraday_breakout(symbol, data, index_move_pct)
+            if breakout:
+                candidates.append(breakout)
 
-            final_score = update_day_memory(
-                result["symbol"],
-                result["boost_score"]
-            )
-
-            result["boost_score"] = final_score
-            result["signal"] = elite_signal(final_score)
-
-            # LEFT / RIGHT SPLIT
-            if final_score >= 10:
-                boosted.append(result)
-            else:
-                candidates.append(result)
+            # -------------------------
+            # RIGHT PANEL: INTRADAY BOOST
+            # -------------------------
+            boost = process_intraday_boost(symbol, data, index_move_pct)
+            if boost:
+                final_score = update_day_memory(
+                    boost["symbol"],
+                    boost["boost_score"]
+                )
+                boost["boost_score"] = final_score
+                boost["signal"] = elite_signal(final_score)
+                boosted.append(boost)
 
         except Exception as e:
             print("ERROR:", symbol, e)
 
-    # 🔒 SORT + TOP 10
-    boosted = sorted(boosted, key=lambda x: x["boost_score"], reverse=True)[:10]
-    candidates = sorted(candidates, key=lambda x: x["boost_score"], reverse=True)[:10]
+    # -------------------------
+    # SORT + TOP 10
+    # -------------------------
+    candidates = sorted(
+        candidates, key=lambda x: x["boost_score"], reverse=True
+    )[:10]
 
-    # 📌 MARKET CLOSE SNAPSHOT (IMPORTANT FIX)
+    boosted = sorted(
+        boosted, key=lambda x: x["boost_score"], reverse=True
+    )[:10]
+
+    # -------------------------
+    # MARKET CLOSE SNAPSHOT
+    # -------------------------
     if is_market_closed():
         if not DAY_STATE["snapshot_saved"]:
             DAY_STATE["final_snapshot"] = boosted
             DAY_STATE["snapshot_saved"] = True
-
         boosted = DAY_STATE["final_snapshot"]
-        candidates = []  # market close ला breakout box empty
+        candidates = []  # market close ला breakout list hide
 
+    # -------------------------
+    # CACHE RESPONSE
+    # -------------------------
     CACHED_RESPONSE = {
         "generated_at": datetime.now().strftime("%H:%M:%S"),
         "data": {
