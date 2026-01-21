@@ -19,7 +19,7 @@ templates = Jinja2Templates(directory="templates")
 # =========================
 
 FO_STOCKS_FULL = FO_STOCKS
-BATCH_SIZE = 15
+BATCH_SIZE = 200
 
 def get_batches(stock_dict):
     items = list(stock_dict.items())
