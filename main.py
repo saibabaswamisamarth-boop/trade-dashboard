@@ -6,7 +6,6 @@ import os
 from datetime import datetime, date
 
 from engines.intraday_boost_engine import process_intraday_boost
-from engines.market_pulse_engine import process_stock
 from stocks_master import FO_STOCKS
 
 # =========================
@@ -19,7 +18,7 @@ templates = Jinja2Templates(directory="templates")
 print("Total stocks loaded:", len(FO_STOCKS))
 
 # =========================
-# DAY MEMORY (LEVEL 3 LOGIC)
+# DAY MEMORY (LEVEL 3)
 # =========================
 
 DAY_STATE = {
@@ -67,7 +66,7 @@ BATCH_SIZE = 200
 
 def get_batches(stock_dict):
     items = list(stock_dict.items())
-    return [items[i:i + BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
+    return [items[i:i+BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
 
 # =========================
 # DHAN CLIENT
@@ -100,6 +99,7 @@ def intraday_boost(batch: int = Query(1, ge=1)):
 
     batches = get_batches(FO_STOCKS_FULL)
     total_batches = len(batches)
+
     if batch > total_batches:
         return {"batch": batch, "total_batches": total_batches, "data": []}
 
@@ -117,10 +117,11 @@ def intraday_boost(batch: int = Query(1, ge=1)):
             result = process_intraday_boost(symbol, data, index_move_pct)
 
             if result:
-                result["boost_score"] = update_day_memory(
+                final_score = update_day_memory(
                     result["symbol"],
                     result["boost_score"]
                 )
+                result["boost_score"] = final_score
                 results.append(result)
 
         except Exception as e:
@@ -128,13 +129,11 @@ def intraday_boost(batch: int = Query(1, ge=1)):
 
     results = sorted(results, key=lambda x: x["boost_score"], reverse=True)
 
-    if is_market_closed():
-        if not DAY_STATE["snapshot_saved"]:
-            DAY_STATE["final_snapshot"] = results[:10]
-            DAY_STATE["snapshot_saved"] = True
-        data = DAY_STATE["final_snapshot"]
-    else:
-        data = results[:10]
+    if is_market_closed() and not DAY_STATE["snapshot_saved"]:
+        DAY_STATE["final_snapshot"] = results[:10]
+        DAY_STATE["snapshot_saved"] = True
+
+    data = DAY_STATE["final_snapshot"] if is_market_closed() else results[:10]
 
     return {
         "batch": batch,
@@ -143,7 +142,7 @@ def intraday_boost(batch: int = Query(1, ge=1)):
     }
 
 # =========================
-# DASHBOARD ROUTE
+# DASHBOARD UI
 # =========================
 
 @app.get("/fo-dashboard", response_class=HTMLResponse)
