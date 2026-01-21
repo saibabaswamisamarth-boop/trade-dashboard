@@ -1,59 +1,88 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Market Pulse – Intraday Boost</title>
-    <style>
-        body { background:#0f172a; color:#e5e7eb; font-family: Arial; }
-        table { width:100%; border-collapse: collapse; }
-        th, td { padding:8px; border-bottom:1px solid #334155; }
-        th { background:#020617; }
-        a { color:#38bdf8; }
-    </style>
+  <title>Intraday Boost Dashboard</title>
+  <style>
+    body { background:#0f172a; color:#e5e7eb; font-family:Arial }
+    h2 { margin:10px }
+    table { width:100%; border-collapse:collapse }
+    th, td { padding:8px; border-bottom:1px solid #334155 }
+    th { background:#020617 }
+    a { color:#38bdf8 }
+    .container { display:flex; gap:20px }
+    .panel { width:50% }
+  </style>
 </head>
 <body>
 
-<h2>📊 Intraday Boost Dashboard</h2>
+<h2>📊 Intraday Market Pulse</h2>
+<p id="time"></p>
 
-<table>
-    <thead>
-        <tr>
-            <th>Symbol</th>
-            <th>Boost</th>
-            <th>R</th>
-            <th>Signal</th>
-            <th>Chart</th>
-        </tr>
-    </thead>
-    <tbody id="rows"></tbody>
-</table>
+<div class="container">
+
+  <!-- LEFT -->
+  <div class="panel">
+    <h3>🟡 Intraday Candidates</h3>
+    <table>
+      <thead>
+        <tr><th>Symbol</th><th>Score</th><th>Signal</th></tr>
+      </thead>
+      <tbody id="candidates"></tbody>
+    </table>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="panel">
+    <h3>🟢 Intraday Boost</h3>
+    <table>
+      <thead>
+        <tr><th>Symbol</th><th>Boost</th><th>R</th><th>Signal</th><th>Chart</th></tr>
+      </thead>
+      <tbody id="boosted"></tbody>
+    </table>
+  </div>
+
+</div>
 
 <script>
 async function loadData(){
-    const res = await fetch("/intraday-boost");
-    const json = await res.json();
+  const res = await fetch("/intraday-boost");
+  const json = await res.json();
 
-    const rows = document.getElementById("rows");
-    rows.innerHTML = "";
+  document.getElementById("time").innerText =
+    "Last Updated: " + json.generated_at;
 
-    json.data.forEach(s => {
-        rows.innerHTML += `
-        <tr>
-            <td>${s.symbol}</td>
-            <td>${s.boost_score}</td>
-            <td>${s.r_factor}</td>
-            <td>${s.signal}</td>
-            <td>
-              <a href="https://www.tradingview.com/chart/?symbol=NSE:${s.symbol}" target="_blank">
-                View
-              </a>
-            </td>
-        </tr>`;
-    });
+  const c = document.getElementById("candidates");
+  const b = document.getElementById("boosted");
+
+  c.innerHTML = "";
+  b.innerHTML = "";
+
+  json.data.candidates.forEach(s => {
+    c.innerHTML += `
+      <tr>
+        <td>${s.symbol}</td>
+        <td>${s.boost_score}</td>
+        <td>${s.signal}</td>
+      </tr>`;
+  });
+
+  json.data.boosted.forEach(s => {
+    b.innerHTML += `
+      <tr>
+        <td>${s.symbol}</td>
+        <td>${s.boost_score}</td>
+        <td>${s.r_factor}</td>
+        <td>${s.signal}</td>
+        <td><a target="_blank"
+          href="https://www.tradingview.com/chart/?symbol=NSE:${s.symbol}">
+          View</a></td>
+      </tr>`;
+  });
 }
 
 loadData();
-setInterval(loadData, 10000);
+setInterval(loadData, 120000); // 2 min
 </script>
 
 </body>
