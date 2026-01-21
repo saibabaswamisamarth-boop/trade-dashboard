@@ -1,13 +1,13 @@
-from datetime import datetime, date
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from dhanhq import dhanhq
 import os
+from datetime import datetime, date
 
-from stocks_master import FO_STOCKS
-from engines.market_pulse_engine import process_stock
 from engines.intraday_boost_engine import process_intraday_boost
+from engines.market_pulse_engine import process_stock
+from stocks_master import FO_STOCKS
 
 # =========================
 # APP SETUP
@@ -16,7 +16,7 @@ from engines.intraday_boost_engine import process_intraday_boost
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-print("Total F&O stocks loaded:", len(FO_STOCKS))
+print("Total stocks loaded:", len(FO_STOCKS))
 
 # =========================
 # DAY MEMORY (LEVEL 3 LOGIC)
@@ -67,7 +67,7 @@ BATCH_SIZE = 200
 
 def get_batches(stock_dict):
     items = list(stock_dict.items())
-    return [items[i:i+BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
+    return [items[i:i + BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
 
 # =========================
 # DHAN CLIENT
@@ -88,105 +88,67 @@ def get_dhan_client():
 def health():
     return {"status": "ok"}
 
-@app.get("/fo-dashboard", response_class=HTMLResponse)
-def fo_dashboard(request: Request):
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {"request": request}
-    )
-
 # =========================
-# MARKET HEAT API (LEFT PANEL)
-# =========================
-
-@app.get("/api/market-heat")
-def market_heat(batch: int = Query(1, ge=1)):
-    dhan = get_dhan_client()
-    results = []
-
-    batches = get_batches(FO_STOCKS_FULL)
-    current_batch = batches[batch - 1]
-
-    for symbol, sid in current_batch:
-        try:
-            q = dhan.quote_data(securities={"NSE_EQ": [sid]})
-            data = q["data"]["data"]["NSE_EQ"].get(str(sid))
-            if not data:
-                continue
-
-            open_p = data["ohlc"]["open"]
-            last_p = data["last_price"]
-            pct = round(((last_p - open_p) / open_p) * 100, 2)
-            r_factor = round(data["volume"] / 1_000_000, 2)
-
-            results.append({
-                "symbol": symbol,
-                "pct": pct,
-                "r_factor": r_factor,
-                "signal": "UP" if pct > 0 else "DOWN"
-            })
-
-        except Exception:
-            pass
-
-    results = sorted(
-        results,
-        key=lambda x: (abs(x["pct"]), x["r_factor"]),
-        reverse=True
-    )[:10]
-
-    return {"data": results}
-
-# =========================
-# INTRADAY BOOST API (RIGHT PANEL)
+# INTRADAY BOOST API
 # =========================
 
 @app.get("/intraday-boost")
 def intraday_boost(batch: int = Query(1, ge=1)):
+
     dhan = get_dhan_client()
     results = []
 
     batches = get_batches(FO_STOCKS_FULL)
     total_batches = len(batches)
-    current_batch = batches[batch - 1]
+    if batch > total_batches:
+        return {"batch": batch, "total_batches": total_batches, "data": []}
 
-    index_move_pct = 0  # future: NIFTY %
+    current_batch = batches[batch - 1]
+    index_move_pct = 0
 
     for symbol, sid in current_batch:
         try:
-            q = dhan.quote_data(securities={"NSE_EQ": [sid]})
-            data = q["data"]["data"]["NSE_EQ"].get(str(sid))
-            if not data:
+            quote = dhan.quote_data(securities={"NSE_EQ": [sid]})
+            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
+            if str(sid) not in nse:
                 continue
 
-            r = process_intraday_boost(symbol, data, index_move_pct)
-            if not r:
-                continue
+            data = nse[str(sid)]
+            result = process_intraday_boost(symbol, data, index_move_pct)
 
-            r["boost_score"] = update_day_memory(
-                r["symbol"],
-                r["boost_score"]
-            )
-            results.append(r)
+            if result:
+                result["boost_score"] = update_day_memory(
+                    result["symbol"],
+                    result["boost_score"]
+                )
+                results.append(result)
 
         except Exception as e:
             print(symbol, e)
 
-    results = sorted(
-        results,
-        key=lambda x: x["boost_score"],
-        reverse=True
-    )
+    results = sorted(results, key=lambda x: x["boost_score"], reverse=True)
 
-    # Market close snapshot
-    if is_market_closed() and not DAY_STATE["snapshot_saved"]:
-        DAY_STATE["final_snapshot"] = results[:10]
-        DAY_STATE["snapshot_saved"] = True
-
-    data = DAY_STATE["final_snapshot"] if is_market_closed() else results[:10]
+    if is_market_closed():
+        if not DAY_STATE["snapshot_saved"]:
+            DAY_STATE["final_snapshot"] = results[:10]
+            DAY_STATE["snapshot_saved"] = True
+        data = DAY_STATE["final_snapshot"]
+    else:
+        data = results[:10]
 
     return {
         "batch": batch,
         "total_batches": total_batches,
         "data": data
     }
+
+# =========================
+# DASHBOARD ROUTE
+# =========================
+
+@app.get("/fo-dashboard", response_class=HTMLResponse)
+def fo_dashboard(request: Request):
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {"request": request}
+    )
