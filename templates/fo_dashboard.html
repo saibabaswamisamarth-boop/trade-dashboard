@@ -101,3 +101,68 @@ loadData();
 
 </body>
 </html>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Market Pulse</title>
+  <style>
+    body { background:#0b1220; color:white; font-family:Arial; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:20px; }
+    .panel { background:#0f172a; padding:15px; border-radius:10px; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:8px; border-bottom:1px solid #1e293b; }
+  </style>
+</head>
+<body>
+
+<div class="grid">
+
+  <div class="panel">
+    <h2>🔥 Market Heat</h2>
+    <table id="heat"></table>
+  </div>
+
+  <div class="panel">
+    <h2>⚡ Intraday Boost</h2>
+    <table id="boost"></table>
+  </div>
+
+</div>
+
+<script>
+async function loadHeat(){
+  const r = await fetch("/api/market-heat");
+  const d = await r.json();
+  let h="<tr><th>Symbol</th><th>%</th><th>R</th></tr>";
+  d.data.forEach(x=>{
+    h+=`<tr>
+      <td>${x.symbol}</td>
+      <td style="color:${x.pct>0?'#22c55e':'#ef4444'}">${x.pct}</td>
+      <td>${x.r_factor}</td>
+    </tr>`;
+  });
+  document.getElementById("heat").innerHTML=h;
+}
+
+async function loadBoost(){
+  const r = await fetch("/intraday-boost");
+  const d = await r.json();
+  let h="<tr><th>Symbol</th><th>Score</th><th>Signal</th></tr>";
+  d.data.forEach(x=>{
+    h+=`<tr>
+      <td>${x.symbol}</td>
+      <td>${x.boost_score}</td>
+      <td>${x.signal}</td>
+    </tr>`;
+  });
+  document.getElementById("boost").innerHTML=h;
+}
+
+loadHeat();
+loadBoost();
+setInterval(()=>{loadHeat();loadBoost()},10000);
+</script>
+
+</body>
+</html>
+
