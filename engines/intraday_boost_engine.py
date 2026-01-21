@@ -153,3 +153,96 @@ def process_intraday_boost(symbol, data, index_move_pct=0):
         "market_mode": market_mode,
         "time": now
     }
+
+def process_intraday_breakout(symbol, data, index_move_pct=0):
+
+    ohlc = data.get("ohlc", {})
+    open_p = ohlc.get("open", 0)
+    high_p = ohlc.get("high", 0)
+    low_p = ohlc.get("low", 0)
+    close_p = data.get("last_price", 0)
+
+    vwap = data.get("average_price", close_p)
+    volume = data.get("volume", 0)
+    prev_close = data.get("prev_close", open_p)
+
+    if not all([open_p, high_p, low_p, close_p]):
+        return None
+
+    # ======================
+    # RANGE DEFINITION
+    # ======================
+    range_high = high_p
+    range_low = low_p
+    range_size = range_high - range_low
+    if range_size <= 0:
+        return None
+
+    # ======================
+    # BREAKOUT / BREAKDOWN
+    # ======================
+    is_breakout = close_p > range_high
+    is_breakdown = close_p < range_low
+    if not (is_breakout or is_breakdown):
+        return None
+
+    # ======================
+    # VWAP FILTER (MANDATORY)
+    # ======================
+    if is_breakout and close_p < vwap:
+        return None
+    if is_breakdown and close_p > vwap:
+        return None
+
+    # ======================
+    # VOLUME EXPANSION
+    # ======================
+    if volume < 1_200_000:
+        return None
+
+    # ======================
+    # CANDLE STRENGTH
+    # ======================
+    body = abs(close_p - open_p)
+    full = high_p - low_p
+    if full == 0 or (body / full) < 0.6:
+        return None
+
+    # ======================
+    # TREND CONFIRMATION
+    # ======================
+    if is_breakout and close_p < open_p:
+        return None
+    if is_breakdown and close_p > open_p:
+        return None
+
+    # ======================
+    # GAP FILTER
+    # ======================
+    gap_pct = abs(open_p - prev_close) / prev_close * 100
+    if gap_pct > 2.5 and volume < 2_000_000:
+        return None
+
+    # ======================
+    # RANGE EXPANSION RATIO
+    # ======================
+    expansion_ratio = body / range_size
+    if expansion_ratio < 0.25:
+        return None
+
+    # ======================
+    # FINAL SCORE
+    # ======================
+    score = 0
+    score += 3
+    score += 2 if volume > 2_000_000 else 1
+    score += 2 if expansion_ratio > 0.35 else 1
+    score += 2 if gap_pct < 1.5 else 0
+
+    return {
+        "symbol": symbol,
+        "boost_score": score,
+        "signal": "INTRADAY BREAKOUT" if is_breakout else "INTRADAY BREAKDOWN",
+        "r_factor": round(volume / 1_000_000, 2),
+        "direction": "UP" if is_breakout else "DOWN"
+    }
