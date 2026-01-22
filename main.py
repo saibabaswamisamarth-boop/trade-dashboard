@@ -1,75 +1,72 @@
-from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI
 from fastapi.templating import Jinja2Templates
-
-from dhanhq import dhanhq
-import os
+from fastapi.responses import HTMLResponse
+from fastapi import Request
 from datetime import datetime
-from zoneinfo import ZoneInfo
-
-from engines.intraday_boost_engine import process_intraday_breakout
-from stocks_master import FO_STOCKS
-
-IST = ZoneInfo("Asia/Kolkata")
-
-def now_str():
-    return datetime.now(IST).strftime("%H:%M:%S")
+import random
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-def get_dhan():
-    return dhanhq(
-        os.getenv("CLIENT_ID"),
-        os.getenv("ACCESS_TOKEN")
-    )
 
-@app.get("/intraday-boost")
-def intraday_boost():
+# ---------------------------------------------------
+# DUMMY ENGINE (replace later with your real logic)
+# ---------------------------------------------------
 
-    dhan = get_dhan()
-    results = []
+def sample_breakout():
+    stocks = [
+        ("OBEROIRLTY", 7, "BEARISH 2.64%"),
+        ("CROMPTON", 7, "BEARISH 2.59%"),
+        ("MUTHOOTFIN", 7, "BEARISH 2.58%"),
+        ("JINDALSTEL", 7, "BULLISH 2.43%"),
+        ("DLF", 7, "BEARISH 2.13%"),
+        ("TATACHEM", 7, "BULLISH 2.08%"),
+        ("TITAN", 7, "BEARISH 2.06%"),
+        ("RECLTD", 6, "BULLISH 1.80%"),
+        ("HINDALCO", 6, "BEARISH 1.65%"),
+        ("AXISBANK", 6, "BULLISH 1.40%"),
+    ]
 
-    for symbol, sid in FO_STOCKS.items():
-        try:
-            quote = dhan.quote_data(securities={"NSE_EQ": [sid]})
-            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
-            if str(sid) not in nse:
-                continue
+    return [
+        {
+            "symbol": s,
+            "score": sc,
+            "signal": sig
+        } for s, sc, sig in stocks
+    ]
 
-            data = nse[str(sid)]
-            br = process_intraday_breakout(symbol, data)
 
-            if br:
-                results.append(br)
+def sample_boost():
+    stocks = [
+        ("RELIANCE", 14, 2.4, "BULLISH"),
+        ("TCS", 13, 1.8, "BULLISH"),
+        ("SBIN", 12, 3.1, "BEARISH"),
+        ("INFY", 11, 1.2, "BULLISH"),
+        ("ITC", 10, 0.9, "BEARISH"),
+    ]
 
-        except Exception as e:
-            print(symbol, e)
+    return [
+        {
+            "symbol": s,
+            "boost": b,
+            "r": r,
+            "signal": sig
+        } for s, b, r, sig in stocks
+    ]
 
-    # 🔥 FINAL RANKING
-    results = sorted(
-        results,
-        key=lambda x: (
-            x["boost_score"],
-            x["move_pct"]
-        ),
-        reverse=True
-    )
 
-    # ✅ Always top 10
-    top10 = results[:10]
+# ---------------------------------------------------
+# ROUTES
+# ---------------------------------------------------
 
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+
+@app.get("/intraday-data")
+def intraday_data():
     return {
-        "generated_at": now_str(),
-        "data": {
-            "candidates": top10,
-            "boosted": []
-        }
+        "breakout": sample_breakout(),
+        "boost": sample_boost()
     }
-
-@app.get("/fo-dashboard", response_class=HTMLResponse)
-def fo_dashboard(request: Request):
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {"request": request}
-    )
