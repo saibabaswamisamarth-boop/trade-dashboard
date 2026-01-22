@@ -1,42 +1,39 @@
 <script>
-function arrow(signal){
-    if(signal.includes("BULLISH"))
-        return `<span style="color:#00ff88;font-weight:700">▲</span>`;
-    else
-        return `<span style="color:#ff4d4d;font-weight:700">▼</span>`;
+function arrow(s){
+ return s==="BULLISH"
+  ? '<span style="color:#00ff88;font-weight:700">▲</span>'
+  : '<span style="color:#ff4d4d;font-weight:700">▼</span>';
 }
 
 async function loadData(){
-    const r = await fetch("/intraday-data");
-    const res = await r.json();
+ const r = await fetch("/intraday-data");
+ const j = await r.json();
 
-    let bhtml="";
-    res.breakout.forEach(x=>{
-        bhtml+=`
-        <tr>
-            <td>${x.symbol}</td>
-            <td>${x.score}</td>
-            <td>${x.rf_pct}%</td>
-            <td>${arrow(x.signal)}</td>
-            <td><a target="_blank" href="https://tradingview.com/chart/?symbol=NSE:${x.symbol}">View</a></td>
-        </tr>`;
-    });
-    document.getElementById("breakout-body").innerHTML=bhtml;
+ let b="",bo="";
 
-    let bohtml="";
-    res.boost.forEach(x=>{
-        bohtml+=`
-        <tr>
-            <td>${x.symbol}</td>
-            <td>${x.score}</td>
-            <td>${x.r_factor}%</td>
-            <td>${arrow(x.signal)}</td>
-            <td><a target="_blank" href="https://tradingview.com/chart/?symbol=NSE:${x.symbol}">View</a></td>
-        </tr>`;
-    });
-    document.getElementById("boost-body").innerHTML=bohtml;
+ j.breakout.forEach(x=>{
+  b+=`<tr>
+   <td>${x.symbol}</td>
+   <td>${x.score}</td>
+   <td>${x.rf_pct}%</td>
+   <td>${arrow(x.signal)}</td>
+   <td><a target="_blank" href="https://tradingview.com/chart/?symbol=NSE:${x.symbol}">View</a></td>
+  </tr>`;
+ });
 
-    document.getElementById("time").innerText=res.time;
+ j.boost.forEach(x=>{
+  bo+=`<tr>
+   <td>${x.symbol}</td>
+   <td>${x.score}</td>
+   <td>${x.r_factor}%</td>
+   <td>${arrow(x.signal)}</td>
+   <td><a target="_blank" href="https://tradingview.com/chart/?symbol=NSE:${x.symbol}">View</a></td>
+  </tr>`;
+ });
+
+ document.getElementById("breakout-body").innerHTML=b;
+ document.getElementById("boost-body").innerHTML=bo;
+ document.getElementById("time").innerText=j.time;
 }
 
 setInterval(loadData,15000);
