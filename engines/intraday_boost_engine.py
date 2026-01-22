@@ -1,21 +1,5 @@
 # engines/intraday_boost_engine.py
 
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
-IST = ZoneInfo("Asia/Kolkata")
-
-# ===============================
-# MEMORY FOR BREAKOUT TRACKING
-# ===============================
-BREAKOUT_MEMORY = {}
-
-def now_hm():
-    return datetime.now(IST).strftime("%H:%M")
-
-# ===============================
-# INTRADAY BREAKOUT ENGINE
-# ===============================
 def process_intraday_breakout(symbol, data):
 
     ohlc = data.get("ohlc", {})
@@ -30,84 +14,49 @@ def process_intraday_breakout(symbol, data):
     if not all([open_p, high_p, low_p, close_p]):
         return None
 
-    # ⏱️ Time filter
-    now = now_hm()
-    if now < "09:20" or now > "10:30":
-        return None
+    # ✅ BASE RANGE (SAFE PROXY)
+    base_high = max(open_p, high_p)
+    base_low = min(open_p, low_p)
 
-    # 📦 Base range (simple proxy)
-    base_high = high_p
-    base_low = low_p
-    base_range = base_high - base_low
-    if base_range <= 0:
-        return None
-
-    # 🔥 Breakout condition
-    bullish = close_p > base_high * 0.998
-    bearish = close_p < base_low * 1.002
+    # ✅ BREAKOUT CONDITION (SOFT)
+    bullish = close_p > base_high * 0.995
+    bearish = close_p < base_low * 1.005
 
     if not (bullish or bearish):
         return None
 
-    # ⚖️ VWAP mandatory
+    # ✅ VWAP FILTER
     if bullish and close_p < vwap:
         return None
     if bearish and close_p > vwap:
         return None
 
-    # 🔊 Volume filter
-    if volume < 250_000:
-        return None
+    # ✅ MOVE % (LIVE, MEMORY FREE)
+    move_pct = round(((close_p - open_p) / open_p) * 100, 2)
 
-    # 🕯️ Candle strength
-    body = abs(close_p - open_p)
-    full = high_p - low_p
-    if full == 0:
-        return None
+    # ✅ SCORE SYSTEM
+    score = 2  # base forming
 
-    body_ratio = body / full
-    if body_ratio < 0.6:
-        return None
-
-    # ===============================
-    # MOVE TRACKING
-    # ===============================
-    if symbol not in BREAKOUT_MEMORY:
-        BREAKOUT_MEMORY[symbol] = {
-            "base_price": close_p,
-            "time": now
-        }
-
-    base_price = BREAKOUT_MEMORY[symbol]["base_price"]
-    move_pct = round(((close_p - base_price) / base_price) * 100, 2)
-
-    # ===============================
-    # SCORE SYSTEM
-    # ===============================
-    score = 5  # forming breakout base
-
-    if abs(move_pct) >= 0.8:
+    if abs(move_pct) >= 0.5:
         score += 2
-    if abs(move_pct) >= 1.5:
-        score += 3
-    if abs(move_pct) >= 3:
-        score += 5
+    if abs(move_pct) >= 1.0:
+        score += 2
+    if volume > 300_000:
+        score += 1
 
-    # Direction
     direction = "BULLISH" if bullish else "BEARISH"
-
-    signal = f"{direction} {move_pct}%"
+    signal = f"{direction} {abs(move_pct)}%"
 
     return {
         "symbol": symbol,
         "boost_score": score,
         "signal": signal,
         "move_pct": abs(move_pct),
-        "direction": direction
     }
 
-# ===============================
-# INTRADAY BOOST (KEEP SIMPLE NOW)
-# ===============================
+
+# ============================
+# Intraday Boost (OFF for now)
+# ============================
 def process_intraday_boost(symbol, data):
     return None
