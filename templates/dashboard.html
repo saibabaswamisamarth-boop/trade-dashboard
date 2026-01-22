@@ -3,71 +3,56 @@
 <head>
     <title>Intraday Market Pulse</title>
     <style>
-        body {
-            background: #0b1622;
-            color: white;
-            font-family: Arial, Helvetica, sans-serif;
+        body{
+            background:#0b1622;
+            color:white;
+            font-family:Arial;
         }
-
-        h2 {
-            margin-left: 10px;
+        .container{
+            display:flex;
+            gap:20px;
         }
-
-        .container {
-            display: flex;
-            gap: 20px;
-            padding: 10px;
+        .panel{
+            flex:1;
+            border:1px solid #2a3b4d;
+            padding:15px;
+            border-radius:10px;
+            background:#0f1f2e;
         }
-
-        .panel {
-            flex: 1;
-            border: 1px solid #2a3a4a;
-            border-radius: 10px;
-            padding: 10px;
-            background: #0f1c2a;
+        table{
+            width:100%;
+            border-collapse:collapse;
         }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
+        th,td{
+            padding:8px;
+            border-bottom:1px solid #2a3b4d;
+            text-align:left;
         }
-
-        th, td {
-            padding: 8px;
-            text-align: left;
-            border-bottom: 1px solid #2a3a4a;
+        th{
+            color:#7fb3ff;
         }
-
-        th {
-            color: #8fb8ff;
+        .bullish{
+            color:#00ff88;
+            font-weight:700;
         }
-
-        a {
-            color: #00bfff;
-            text-decoration: none;
+        .bearish{
+            color:#ff4d4d;
+            font-weight:700;
         }
-
-        .bullish {
-            color: #00ff88;
-            font-weight: bold;
-        }
-
-        .bearish {
-            color: #ff4d4d;
-            font-weight: bold;
+        h2{
+            margin-top:0;
         }
     </style>
 </head>
 <body>
 
-<h2>📊 Intraday Market Pulse</h2>
-<div style="margin-left:10px;">Last Updated: <span id="time"></span></div>
+<h1>Intraday Market Pulse</h1>
+<div>Last Updated: <span id="time"></span></div>
 
 <div class="container">
-
     <!-- LEFT PANEL -->
     <div class="panel">
-        <h3>🟡 INTRADAY BREAKOUT</h3>
+        <h2>🟡 INTRADAY BREAKOUT</h2>
         <table>
             <thead>
                 <tr>
@@ -83,13 +68,12 @@
 
     <!-- RIGHT PANEL -->
     <div class="panel">
-        <h3>🟢 INTRADAY BOOST</h3>
+        <h2>🟢 INTRADAY BOOST</h2>
         <table>
             <thead>
                 <tr>
                     <th>Symbol</th>
                     <th>Boost</th>
-                    <th>R</th>
                     <th>Signal</th>
                     <th>Chart</th>
                 </tr>
@@ -97,7 +81,6 @@
             <tbody id="boost-body"></tbody>
         </table>
     </div>
-
 </div>
 
 <script>
@@ -111,43 +94,32 @@ async function loadData(){
     const res = await fetch('/intraday-boost');
     const json = await res.json();
 
-    document.getElementById("time").innerText = json.generated_at;
+    const rows = json.data || [];
 
-    const breakout = json.data.candidates || [];
-    const boost = json.data.boosted || [];
-
-    let bhtml = "";
-    breakout.forEach(row => {
+    let html = "";
+    rows.forEach(row=>{
         const cls = getClass(row.signal);
-        bhtml += `
+        html += `
             <tr>
                 <td class="${cls}">${row.symbol}</td>
                 <td>${row.boost_score}</td>
                 <td class="${cls}">${row.signal}</td>
-                <td><a target="_blank" href="https://www.tradingview.com/chart/?symbol=NSE:${row.symbol}">View</a></td>
+                <td>
+                    <a target="_blank"
+                    href="https://www.tradingview.com/chart/?symbol=NSE:${row.symbol}">
+                    View</a>
+                </td>
             </tr>
         `;
     });
-    document.getElementById("breakout-body").innerHTML = bhtml;
 
-    let rhtml = "";
-    boost.forEach(row => {
-        const cls = getClass(row.signal);
-        rhtml += `
-            <tr>
-                <td class="${cls}">${row.symbol}</td>
-                <td>${row.boost_score}</td>
-                <td>${row.r_factor || ""}</td>
-                <td class="${cls}">${row.signal}</td>
-                <td><a target="_blank" href="https://www.tradingview.com/chart/?symbol=NSE:${row.symbol}">View</a></td>
-            </tr>
-        `;
-    });
-    document.getElementById("boost-body").innerHTML = rhtml;
+    document.getElementById("breakout-body").innerHTML = html;
+    document.getElementById("boost-body").innerHTML = html;
+    document.getElementById("time").innerText = new Date().toLocaleTimeString();
 }
 
 loadData();
-setInterval(loadData, 20000);
+setInterval(loadData, 15000);
 </script>
 
 </body>
