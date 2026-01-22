@@ -3,13 +3,8 @@ from zoneinfo import ZoneInfo
 
 IST = ZoneInfo("Asia/Kolkata")
 
-# Morning breakout memory (TOP 10 sustain साठी)
-MORNING_MEMORY = {}
-
-
 def now_hm():
     return datetime.now(IST).strftime("%H:%M")
-
 
 def pct(a, b):
     if a == 0:
@@ -21,51 +16,32 @@ def process_intraday_breakout(symbol, data):
 
     ohlc = data.get("ohlc", {})
     open_p = ohlc.get("open", 0)
-    ltp = data.get("last_price", 0)
-    vwap = data.get("average_price", ltp)
+    close_p = data.get("last_price", 0)
+    vwap = data.get("average_price", close_p)
     volume = data.get("volume", 0)
 
-    if not open_p or not ltp:
+    if not open_p or not close_p:
         return None
 
-    time_now = now_hm()
+    move_pct = round(pct(open_p, close_p), 2)
 
-    # ---------------------------------------------------------
-    # 🔴 STEP 1 — 9:20 नंतर FIRST REAL BREAKOUT पकड
-    # ---------------------------------------------------------
-    if symbol not in MORNING_MEMORY:
+    if abs(move_pct) < 2:
+        return None
 
-        move_from_open = pct(open_p, ltp)
+    if move_pct > 0 and close_p < vwap:
+        return None
+    if move_pct < 0 and close_p > vwap:
+        return None
 
-        # Real move + volume + VWAP confirmation
-        if abs(move_from_open) > 2 and volume > 300000:
-            MORNING_MEMORY[symbol] = {
-                "break_price": ltp,
-                "break_time": time_now,
-                "direction": "BULLISH" if ltp > vwap else "BEARISH"
-            }
+    if volume < 300000:
+        return None
 
-    # ---------------------------------------------------------
-    # 🟢 STEP 2 — Breakout price पासून movement calculate
-    # ---------------------------------------------------------
-    if symbol in MORNING_MEMORY:
+    direction = "BULLISH" if move_pct > 0 else "BEARISH"
+    score = int(abs(move_pct)) + 5
 
-        bp = MORNING_MEMORY[symbol]["break_price"]
-        direction = MORNING_MEMORY[symbol]["direction"]
-        break_time = MORNING_MEMORY[symbol]["break_time"]
-
-        move_pct = abs(pct(bp, ltp))
-        move_pct = round(move_pct, 2)
-
-        score = int(move_pct) + 5
-
-        signal = f"{direction} {move_pct}% @ {break_time}"
-
-        return {
-            "symbol": symbol,
-            "score": score,
-            "signal": signal,
-            "move_pct": move_pct
-        }
-
-    return None
+    return {
+        "symbol": symbol,
+        "score": score,
+        "rf_pct": abs(move_pct),
+        "signal": direction
+    }
