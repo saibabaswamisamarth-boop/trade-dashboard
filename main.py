@@ -51,60 +51,28 @@ def intraday_data():
 
             data = nse[str(sid)]
 
-            # -------- BREAKOUT LOCK --------
+            # -------- BREAKOUT PURE LOCK --------
             b1 = process_intraday_breakout(symbol, data)
             if b1:
-                rf = b1["rf_pct"]
-
                 if symbol in DAY_BREAKOUT_MEMORY:
-                    DAY_BREAKOUT_MEMORY[symbol] = b1
+                    DAY_BREAKOUT_MEMORY[symbol].update(b1)
                 elif len(DAY_BREAKOUT_MEMORY) < 10:
                     DAY_BREAKOUT_MEMORY[symbol] = b1
-                else:
-                    weakest = min(
-                        DAY_BREAKOUT_MEMORY.items(),
-                        key=lambda x: x[1]["rf_pct"]
-                    )
-                    if rf > weakest[1]["rf_pct"]:
-                        del DAY_BREAKOUT_MEMORY[weakest[0]]
-                        DAY_BREAKOUT_MEMORY[symbol] = b1
 
-            # -------- BOOST LOCK --------
+            # -------- BOOST PURE LOCK --------
             b2 = process_intraday_boost(symbol, data)
             if b2:
-                rf = b2["r_factor"]
-
                 if symbol in DAY_BOOST_MEMORY:
-                    DAY_BOOST_MEMORY[symbol] = b2
+                    DAY_BOOST_MEMORY[symbol].update(b2)
                 elif len(DAY_BOOST_MEMORY) < 10:
                     DAY_BOOST_MEMORY[symbol] = b2
-                else:
-                    weakest = min(
-                        DAY_BOOST_MEMORY.items(),
-                        key=lambda x: x[1]["r_factor"]
-                    )
-                    if rf > weakest[1]["r_factor"]:
-                        del DAY_BOOST_MEMORY[weakest[0]]
-                        DAY_BOOST_MEMORY[symbol] = b2
 
         except:
             continue
 
-    breakout_list = sorted(
-        DAY_BREAKOUT_MEMORY.values(),
-        key=lambda x: x["rf_pct"],
-        reverse=True
-    )
-
-    boost_list = sorted(
-        DAY_BOOST_MEMORY.values(),
-        key=lambda x: x["r_factor"],
-        reverse=True
-    )
-
     return {
-        "breakout": breakout_list,
-        "boost": boost_list,
+        "breakout": list(DAY_BREAKOUT_MEMORY.values()),
+        "boost": list(DAY_BOOST_MEMORY.values()),
         "time": datetime.now(IST).strftime("%I:%M:%S %p")
     }
 
