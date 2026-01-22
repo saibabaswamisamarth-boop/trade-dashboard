@@ -43,13 +43,27 @@ def intraday_data():
     dhan = get_dhan_client()
 
     for symbol, sid in FO_STOCKS.items():
-        try:
-            quote = dhan.quote_data(securities={"NSE_EQ": [sid]})
-            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
-            if str(sid) not in nse:
-                continue
+    try:
+        quote = dhan.quote_data(securities={"NSE_EQ": [sid]})
+        nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
+        if str(sid) not in nse:
+            continue
 
-            data = nse[str(sid)]
+        data = nse[str(sid)]
+
+        # ---------------- BREAKOUT ----------------
+        b1 = process_intraday_breakout(symbol, data)
+        if b1:
+            DAY_STATE["breakout"][symbol] = b1
+
+        # ---------------- BOOST ----------------
+        b2 = process_intraday_boost(symbol, data)
+        if b2:
+            DAY_STATE["boost"][symbol] = b2
+
+    except Exception as e:
+        continue
+
 
             # -------- BREAKOUT SMART LOCK --------
             b1 = process_intraday_breakout(symbol, data)
@@ -121,3 +135,4 @@ def fo_dashboard(request: Request):
         "fo_dashboard.html",
         {"request": request}
     )
+
