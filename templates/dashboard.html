@@ -3,70 +3,101 @@
 <head>
     <title>Intraday Market Pulse</title>
     <style>
-        body{
-            background:#0b1622;
-            color:white;
-            font-family:Arial, Helvetica, sans-serif;
-        }
-        h1{
-            margin-bottom:5px;
-        }
-        table{
-            width:100%;
-            border-collapse:collapse;
-            margin-top:15px;
-        }
-        th,td{
-            padding:10px;
-            text-align:left;
-            border-bottom:1px solid #1f2c3a;
-        }
-        th{
-            color:#7fc7ff;
-            font-weight:600;
-        }
-        a{
-            color:#4db8ff;
-            text-decoration:none;
+        body {
+            background: #0b1622;
+            color: white;
+            font-family: Arial, Helvetica, sans-serif;
         }
 
-        /* 🔥 COLOR LOGIC */
-        .bullish{
-            color:#00ff88;
-            font-weight:700;
-        }
-        .bearish{
-            color:#ff4d4d;
-            font-weight:700;
+        h2 {
+            margin-left: 10px;
         }
 
-        .box{
-            border:1px solid #2a3b4d;
-            padding:15px;
-            border-radius:8px;
-            margin-top:20px;
+        .container {
+            display: flex;
+            gap: 20px;
+            padding: 10px;
+        }
+
+        .panel {
+            flex: 1;
+            border: 1px solid #2a3a4a;
+            border-radius: 10px;
+            padding: 10px;
+            background: #0f1c2a;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #2a3a4a;
+        }
+
+        th {
+            color: #8fb8ff;
+        }
+
+        a {
+            color: #00bfff;
+            text-decoration: none;
+        }
+
+        .bullish {
+            color: #00ff88;
+            font-weight: bold;
+        }
+
+        .bearish {
+            color: #ff4d4d;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-<h1>📊 Intraday Market Pulse</h1>
-<div>Last Updated: <span id="time">--:--</span></div>
+<h2>📊 Intraday Market Pulse</h2>
+<div style="margin-left:10px;">Last Updated: <span id="time"></span></div>
 
-<div class="box">
-    <h2>🟡 INTRADAY BREAKOUT</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>SYMBOL</th>
-                <th>SCORE</th>
-                <th>SIGNAL</th>
-                <th>CHART</th>
-            </tr>
-        </thead>
-        <tbody id="breakout-body">
-        </tbody>
-    </table>
+<div class="container">
+
+    <!-- LEFT PANEL -->
+    <div class="panel">
+        <h3>🟡 INTRADAY BREAKOUT</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Score</th>
+                    <th>Signal</th>
+                    <th>Chart</th>
+                </tr>
+            </thead>
+            <tbody id="breakout-body"></tbody>
+        </table>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="panel">
+        <h3>🟢 INTRADAY BOOST</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Boost</th>
+                    <th>R</th>
+                    <th>Signal</th>
+                    <th>Chart</th>
+                </tr>
+            </thead>
+            <tbody id="boost-body"></tbody>
+        </table>
+    </div>
+
 </div>
 
 <script>
@@ -77,34 +108,46 @@ function getClass(signal){
 }
 
 async function loadData(){
-    const res = await fetch("/intraday-boost");
-    const data = await res.json();
+    const res = await fetch('/intraday-boost');
+    const json = await res.json();
 
-    document.getElementById("time").innerText = data.generated_at;
+    document.getElementById("time").innerText = json.generated_at;
 
-    const body = document.getElementById("breakout-body");
-    body.innerHTML = "";
+    const breakout = json.data.candidates || [];
+    const boost = json.data.boosted || [];
 
-    data.data.candidates.forEach(row=>{
+    let bhtml = "";
+    breakout.forEach(row => {
         const cls = getClass(row.signal);
-
-        body.innerHTML += `
+        bhtml += `
             <tr>
                 <td class="${cls}">${row.symbol}</td>
                 <td>${row.boost_score}</td>
                 <td class="${cls}">${row.signal}</td>
-                <td>
-                    <a href="https://www.tradingview.com/chart/?symbol=NSE:${row.symbol}" target="_blank">
-                        View
-                    </a>
-                </td>
+                <td><a target="_blank" href="https://www.tradingview.com/chart/?symbol=NSE:${row.symbol}">View</a></td>
             </tr>
         `;
     });
+    document.getElementById("breakout-body").innerHTML = bhtml;
+
+    let rhtml = "";
+    boost.forEach(row => {
+        const cls = getClass(row.signal);
+        rhtml += `
+            <tr>
+                <td class="${cls}">${row.symbol}</td>
+                <td>${row.boost_score}</td>
+                <td>${row.r_factor || ""}</td>
+                <td class="${cls}">${row.signal}</td>
+                <td><a target="_blank" href="https://www.tradingview.com/chart/?symbol=NSE:${row.symbol}">View</a></td>
+            </tr>
+        `;
+    });
+    document.getElementById("boost-body").innerHTML = rhtml;
 }
 
-setInterval(loadData, 5000);
 loadData();
+setInterval(loadData, 20000);
 </script>
 
 </body>
