@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Intraday Market Pulse</title>
+    <title>Intraday Breakout</title>
     <style>
         body{
             background:#0b1622;
@@ -42,14 +42,18 @@
         h2{
             margin-top:0;
         }
+        a{
+            color:#7fb3ff;
+        }
     </style>
 </head>
 <body>
 
-<h1>Intraday Market Pulse</h1>
+<h1>Intraday Breakout</h1>
 <div>Last Updated: <span id="time"></span></div>
 
 <div class="container">
+
     <!-- LEFT PANEL -->
     <div class="panel">
         <h2>🟡 INTRADAY BREAKOUT</h2>
@@ -90,10 +94,34 @@ function getClass(signal){
     return "";
 }
 
-async function loadData(){
+function chartLink(symbol){
+    return `https://www.tradingview.com/chart/?symbol=NSE:${symbol}`;
+}
+
+async function loadBreakout(){
+    const res = await fetch('/intraday-breakout');
+    const json = await res.json();
+    const rows = json.data || [];
+
+    let html = "";
+    rows.forEach(row=>{
+        const cls = getClass(row.signal);
+        html += `
+            <tr>
+                <td class="${cls}">${row.symbol}</td>
+                <td>${row.score}</td>
+                <td class="${cls}">${row.signal}</td>
+                <td><a target="_blank" href="${chartLink(row.symbol)}">View</a></td>
+            </tr>
+        `;
+    });
+
+    document.getElementById("breakout-body").innerHTML = html;
+}
+
+async function loadBoost(){
     const res = await fetch('/intraday-boost');
     const json = await res.json();
-
     const rows = json.data || [];
 
     let html = "";
@@ -104,22 +132,22 @@ async function loadData(){
                 <td class="${cls}">${row.symbol}</td>
                 <td>${row.boost_score}</td>
                 <td class="${cls}">${row.signal}</td>
-                <td>
-                    <a target="_blank"
-                    href="https://www.tradingview.com/chart/?symbol=NSE:${row.symbol}">
-                    View</a>
-                </td>
+                <td><a target="_blank" href="${chartLink(row.symbol)}">View</a></td>
             </tr>
         `;
     });
 
-    document.getElementById("breakout-body").innerHTML = html;
     document.getElementById("boost-body").innerHTML = html;
+}
+
+async function loadAll(){
+    await loadBreakout();
+    await loadBoost();
     document.getElementById("time").innerText = new Date().toLocaleTimeString();
 }
 
-loadData();
-setInterval(loadData, 15000);
+loadAll();
+setInterval(loadAll, 15000);
 </script>
 
 </body>
