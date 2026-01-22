@@ -1,7 +1,3 @@
-rom zoneinfo import ZoneInfo
-
-IST = ZoneInfo("Asia/Kolkata")
-
 def pct(a, b):
     if a == 0:
         return 0
@@ -39,3 +35,4 @@ def process_intraday_breakout(symbol, data):
         "rf_pct": rf_pct,
         "signal": signal
     }
+
