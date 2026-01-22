@@ -37,7 +37,8 @@ def process_intraday_boost(symbol, data):
     r_factor = (
         move_from_open * 3 +
         expansion * 4 +
-        vwap_dist * 2
+        rf_pct = (move_from_open * 5) + (expansion * 5)
+
     )
     r_factor = round(r_factor, 2)
 
@@ -49,3 +50,4 @@ def process_intraday_boost(symbol, data):
         "r_factor": r_factor,
         "signal": signal
     }
+
