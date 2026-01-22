@@ -5,7 +5,7 @@ IST = ZoneInfo("Asia/Kolkata")
 def pct(a, b):
     if a == 0:
         return 0
-    return ((b - a) / a) * 100
+    return ((b - a) / a) * 10
 
 
 def process_intraday_breakout(symbol, data):
@@ -41,5 +41,6 @@ def process_intraday_breakout(symbol, data):
         "rf_pct": rf_pct,
         "signal": signal
     }
+
 
 
