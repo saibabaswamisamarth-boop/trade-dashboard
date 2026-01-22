@@ -1,3 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Intraday Market Pulse</title>
+    <style>
+        body{background:#0b1622;color:white;font-family:Arial;}
+        .container{display:flex;gap:20px;}
+        .panel{flex:1;border:1px solid #2a3b4d;padding:15px;border-radius:10px;background:#0f1f2e;}
+        table{width:100%;border-collapse:collapse;}
+        th,td{padding:8px;border-bottom:1px solid #2a3b4d;text-align:left;}
+        th{color:#7fb3ff;}
+        a{color:#7fb3ff;}
+    </style>
+</head>
+<body>
+
+<h1>Intraday Market Pulse</h1>
+<div>Last Updated: <span id="time"></span></div>
+
+<div class="container">
+
+<div class="panel">
+<h2>🟡 INTRADAY BREAKOUT</h2>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Score</th>
+<th>RF %</th>
+<th>Signal</th>
+<th>Chart</th>
+</tr>
+</thead>
+<tbody id="breakout-body"></tbody>
+</table>
+</div>
+
+<div class="panel">
+<h2>🟢 INTRADAY BOOST</h2>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Boost</th>
+<th>R-Factor %</th>
+<th>Signal</th>
+<th>Chart</th>
+</tr>
+</thead>
+<tbody id="boost-body"></tbody>
+</table>
+</div>
+
+</div>
+
 <script>
 function arrow(s){
  return s==="BULLISH"
@@ -39,3 +94,6 @@ async function loadData(){
 setInterval(loadData,15000);
 loadData();
 </script>
+
+</body>
+</html>
