@@ -20,7 +20,8 @@ def process_intraday_breakout(symbol, data):
     if not open_p or not close_p:
         return None
 
-    range_pct = abs(pct(low_p, high_p))
+    r_factor = (move_from_open * 6) + (expansion * 4)
+
 
     # 🔥 CORE RUNNER LOGIC
     move_from_open = abs(pct(open_p, close_p))
@@ -50,3 +51,4 @@ def process_intraday_breakout(symbol, data):
         "rf_pct": rf_pct,
         "signal": signal
     }
+
