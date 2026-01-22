@@ -3,9 +3,14 @@ from zoneinfo import ZoneInfo
 
 IST = ZoneInfo("Asia/Kolkata")
 
+
 def now_hm():
     return datetime.now(IST).strftime("%H:%M")
 
+
+# -------------------------------------------------
+# BREAKOUT ENGINE (LEFT PANEL)
+# -------------------------------------------------
 def process_intraday_breakout(symbol, data):
 
     ohlc = data.get("ohlc", {})
@@ -17,23 +22,17 @@ def process_intraday_breakout(symbol, data):
     if not open_p or not close_p:
         return None
 
-    # -----------------------------
-    # RANGE EXPANSION FROM OPEN
-    # -----------------------------
     move_pct = ((close_p - open_p) / open_p) * 100
     move_pct = round(move_pct, 2)
 
-    # Minimum 2% move (real breakout)
+    # Real breakout filter
     if abs(move_pct) < 2:
         return None
 
     # VWAP confirmation
-    bullish = close_p > vwap
-    bearish = close_p < vwap
-
-    if move_pct > 0 and not bullish:
+    if move_pct > 0 and close_p < vwap:
         return None
-    if move_pct < 0 and not bearish:
+    if move_pct < 0 and close_p > vwap:
         return None
 
     # Volume filter
@@ -41,14 +40,13 @@ def process_intraday_breakout(symbol, data):
         return None
 
     direction = "BULLISH" if move_pct > 0 else "BEARISH"
-
     score = int(abs(move_pct)) + 5
 
     signal = f"{direction} {abs(move_pct)}%"
 
     return {
         "symbol": symbol,
-        "boost_score": score,
+        "score": score,
         "signal": signal,
         "move_pct": abs(move_pct),
         "direction": direction,
@@ -56,18 +54,16 @@ def process_intraday_breakout(symbol, data):
     }
 
 
-def process_intraday_boost(symbol, data):
-    return None
-
-# engines/intraday_boost_engine.py
-
+# -------------------------------------------------
+# BOOST ENGINE (RIGHT PANEL — R FACTOR)
+# -------------------------------------------------
 def pct(a, b):
     if a == 0:
         return 0
     return ((b - a) / a) * 100
 
 
-def process_intraday_boost(symbol, data, index_move_pct=0):
+def process_intraday_boost(symbol, data):
 
     ohlc = data.get("ohlc", {})
     depth = data.get("depth", {})
@@ -86,34 +82,19 @@ def process_intraday_boost(symbol, data, index_move_pct=0):
     if not open_p or not close_p:
         return None
 
-    # -----------------------------
     # 1. Range Expansion
-    # -----------------------------
     range_pct = abs(pct(low_p, high_p))
 
-    # -----------------------------
     # 2. Move From Open
-    # -----------------------------
     move_pct = abs(pct(open_p, close_p))
 
-    # -----------------------------
-    # 3. VWAP Position
-    # -----------------------------
-    vwap_side = 1 if close_p > vwap else -1
-
-    # -----------------------------
-    # 4. Volume Power
-    # -----------------------------
+    # 3. Volume Power
     volume_factor = volume / 300000
 
-    # -----------------------------
-    # 5. Buyer / Seller Imbalance
-    # -----------------------------
+    # 4. Buyer/Seller Imbalance
     imbalance = (buy_qty - sell_qty) / max((buy_qty + sell_qty), 1)
 
-    # -----------------------------
-    # 6. Final R-Factor (Activity Score)
-    # -----------------------------
+    # 5. R-Factor Calculation
     r_factor = (
         range_pct * 1.5 +
         move_pct * 2 +
@@ -123,21 +104,19 @@ def process_intraday_boost(symbol, data, index_move_pct=0):
 
     r_factor = round(r_factor, 2)
 
-    # -----------------------------
-    # Signal
-    # -----------------------------
-    if imbalance > 0 and vwap_side > 0:
+    # Signal logic
+    if imbalance > 0 and close_p > vwap:
         signal = "STRONG BULLISH"
-    elif imbalance < 0 and vwap_side < 0:
+    elif imbalance < 0 and close_p < vwap:
         signal = "STRONG BEARISH"
-    elif vwap_side > 0:
+    elif close_p > vwap:
         signal = "BULLISH"
     else:
         signal = "BEARISH"
 
     return {
         "symbol": symbol,
-        "boost_score": r_factor,   # sorting यावर होणार
+        "boost": r_factor,
         "r_factor": r_factor,
         "signal": signal
     }
