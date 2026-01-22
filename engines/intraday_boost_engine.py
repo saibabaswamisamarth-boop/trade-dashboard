@@ -1,5 +1,21 @@
 # engines/intraday_boost_engine.py
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+IST = ZoneInfo("Asia/Kolkata")
+
+# ============================
+# BREAKOUT MEMORY
+# ============================
+BREAKOUT_STATE = {}
+
+def now_hm():
+    return datetime.now(IST).strftime("%H:%M")
+
+# ============================
+# INTRADAY BREAKOUT ENGINE
+# ============================
 def process_intraday_breakout(symbol, data):
 
     ohlc = data.get("ohlc", {})
@@ -14,49 +30,84 @@ def process_intraday_breakout(symbol, data):
     if not all([open_p, high_p, low_p, close_p]):
         return None
 
-    # ✅ BASE RANGE (SAFE PROXY)
+    now = now_hm()
+
+    # ⏱️ Only after 9:25
+    if now < "09:25":
+        return None
+
+    # ============================
+    # BASE RANGE (OPENING RANGE PROXY)
+    # ============================
     base_high = max(open_p, high_p)
     base_low = min(open_p, low_p)
 
-    # ✅ BREAKOUT CONDITION (SOFT)
-    bullish = close_p > base_high * 0.995
-    bearish = close_p < base_low * 1.005
+    bullish_break = close_p > base_high * 1.001
+    bearish_break = close_p < base_low * 0.999
 
-    if not (bullish or bearish):
+    if not (bullish_break or bearish_break):
         return None
 
-    # ✅ VWAP FILTER
-    if bullish and close_p < vwap:
+    # ============================
+    # VWAP FILTER (MANDATORY)
+    # ============================
+    if bullish_break and close_p < vwap:
         return None
-    if bearish and close_p > vwap:
+    if bearish_break and close_p > vwap:
         return None
 
-    # ✅ MOVE % (LIVE, MEMORY FREE)
-    move_pct = round(((close_p - open_p) / open_p) * 100, 2)
+    # ============================
+    # FIRST BREAKOUT CAPTURE
+    # ============================
+    if symbol not in BREAKOUT_STATE:
+        BREAKOUT_STATE[symbol] = {
+            "break_price": close_p,
+            "break_time": now,
+            "direction": "BULLISH" if bullish_break else "BEARISH"
+        }
 
-    # ✅ SCORE SYSTEM
-    score = 2  # base forming
+    state = BREAKOUT_STATE[symbol]
+    base_price = state["break_price"]
+
+    # ============================
+    # MOVE % AFTER BREAKOUT
+    # ============================
+    move_pct = round(
+        ((close_p - base_price) / base_price) * 100,
+        2
+    )
+
+    # ============================
+    # SCORE (FORMING → STRONG)
+    # ============================
+    score = 3  # breakout detected
 
     if abs(move_pct) >= 0.5:
         score += 2
     if abs(move_pct) >= 1.0:
         score += 2
+    if abs(move_pct) >= 2.0:
+        score += 3
+
     if volume > 300_000:
         score += 1
 
-    direction = "BULLISH" if bullish else "BEARISH"
-    signal = f"{direction} {abs(move_pct)}%"
+    direction = state["direction"]
+
+    signal = f"{direction} {abs(move_pct)}% @{state['break_time']}"
 
     return {
         "symbol": symbol,
         "boost_score": score,
         "signal": signal,
         "move_pct": abs(move_pct),
+        "direction": direction,
+        "break_time": state["break_time"]
     }
 
 
 # ============================
-# Intraday Boost (OFF for now)
+# Intraday Boost (OFF NOW)
 # ============================
 def process_intraday_boost(symbol, data):
     return None
