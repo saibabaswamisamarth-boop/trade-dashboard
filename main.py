@@ -15,19 +15,18 @@ IST = ZoneInfo("Asia/Kolkata")
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# ---------------- DAY MEMORY ----------------
-DAY_STATE = {
-    "date": date.today().isoformat(),
-    "breakout": {},
-    "boost": {}
-}
+# ---------------- SMART DAY MEMORY ----------------
+DAY_DATE = date.today().isoformat()
+DAY_BREAKOUT_MEMORY = {}
+DAY_BOOST_MEMORY = {}
 
 def reset_day():
+    global DAY_DATE, DAY_BREAKOUT_MEMORY, DAY_BOOST_MEMORY
     today = date.today().isoformat()
-    if DAY_STATE["date"] != today:
-        DAY_STATE["date"] = today
-        DAY_STATE["breakout"] = {}
-        DAY_STATE["boost"] = {}
+    if DAY_DATE != today:
+        DAY_DATE = today
+        DAY_BREAKOUT_MEMORY = {}
+        DAY_BOOST_MEMORY = {}
 
 # ---------------- DHAN ----------------
 def get_dhan_client():
@@ -52,46 +51,66 @@ def intraday_data():
 
             data = nse[str(sid)]
 
-            # -------- BREAKOUT --------
+            # -------- BREAKOUT SMART LOCK --------
             b1 = process_intraday_breakout(symbol, data)
             if b1:
-                if symbol not in DAY_STATE["breakout"]:
-                    DAY_STATE["breakout"][symbol] = b1
-                else:
-                    DAY_STATE["breakout"][symbol].update(b1)
+                sym = b1["symbol"]
+                rf = b1["rf_pct"]
 
-            # -------- BOOST --------
+                if sym in DAY_BREAKOUT_MEMORY:
+                    DAY_BREAKOUT_MEMORY[sym] = b1
+
+                elif len(DAY_BREAKOUT_MEMORY) < 10:
+                    DAY_BREAKOUT_MEMORY[sym] = b1
+
+                else:
+                    weakest = min(
+                        DAY_BREAKOUT_MEMORY.items(),
+                        key=lambda x: x[1]["rf_pct"]
+                    )
+                    if rf > weakest[1]["rf_pct"]:
+                        del DAY_BREAKOUT_MEMORY[weakest[0]]
+                        DAY_BREAKOUT_MEMORY[sym] = b1
+
+            # -------- BOOST SMART LOCK --------
             b2 = process_intraday_boost(symbol, data)
             if b2:
-                if symbol not in DAY_STATE["boost"]:
-                    DAY_STATE["boost"][symbol] = b2
+                sym = b2["symbol"]
+                rf = b2["r_factor"]
+
+                if sym in DAY_BOOST_MEMORY:
+                    DAY_BOOST_MEMORY[sym] = b2
+
+                elif len(DAY_BOOST_MEMORY) < 10:
+                    DAY_BOOST_MEMORY[sym] = b2
+
                 else:
-                    DAY_STATE["boost"][symbol].update(b2)
+                    weakest = min(
+                        DAY_BOOST_MEMORY.items(),
+                        key=lambda x: x[1]["r_factor"]
+                    )
+                    if rf > weakest[1]["r_factor"]:
+                        del DAY_BOOST_MEMORY[weakest[0]]
+                        DAY_BOOST_MEMORY[sym] = b2
 
         except:
             continue
 
-    # ---------------- TOP 10 LOCKING LOGIC ----------------
-
-    breakout_sorted = sorted(
-        DAY_STATE["breakout"].values(),
-        key=lambda x: x["move_pct"],
+    breakout_list = sorted(
+        DAY_BREAKOUT_MEMORY.values(),
+        key=lambda x: x["rf_pct"],
         reverse=True
     )
 
-    boost_sorted = sorted(
-        DAY_STATE["boost"].values(),
+    boost_list = sorted(
+        DAY_BOOST_MEMORY.values(),
         key=lambda x: x["r_factor"],
         reverse=True
     )
 
-    # फक्त top 10 memory मध्ये ठेव
-    DAY_STATE["breakout"] = {x["symbol"]: x for x in breakout_sorted[:10]}
-    DAY_STATE["boost"] = {x["symbol"]: x for x in boost_sorted[:10]}
-
     return {
-        "breakout": list(DAY_STATE["breakout"].values()),
-        "boost": list(DAY_STATE["boost"].values()),
+        "breakout": breakout_list,
+        "boost": boost_list,
         "time": datetime.now(IST).strftime("%I:%M:%S %p")
     }
 
