@@ -16,9 +16,6 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
 
-# ---------------------------------------------
-# DHAN CLIENT
-# ---------------------------------------------
 def get_dhan_client():
     return dhanhq(
         os.getenv("CLIENT_ID"),
@@ -26,9 +23,6 @@ def get_dhan_client():
     )
 
 
-# ---------------------------------------------
-# INTRADAY DATA API (FOR DASHBOARD)
-# ---------------------------------------------
 @app.get("/intraday-data")
 def intraday_data():
 
@@ -47,31 +41,23 @@ def intraday_data():
 
             data = nse[str(sid)]
 
-            # ------------------ BREAKOUT ------------------
             b1 = process_intraday_breakout(symbol, data)
             if b1:
                 breakout_list.append(b1)
 
-            # ------------------ BOOST ------------------
             b2 = process_intraday_boost(symbol, data)
             if b2:
                 boost_list.append(b2)
 
-        except Exception as e:
+        except:
             continue
 
-    # ---------------------------------------------
-    # SORTING LOGIC (VERY IMPORTANT)
-    # ---------------------------------------------
-
-    # Breakout → movement % नुसार
     breakout_list = sorted(
         breakout_list,
         key=lambda x: x["move_pct"],
         reverse=True
     )[:10]
 
-    # Boost → R Factor नुसार
     boost_list = sorted(
         boost_list,
         key=lambda x: x["r_factor"],
@@ -85,9 +71,6 @@ def intraday_data():
     }
 
 
-# ---------------------------------------------
-# DASHBOARD UI
-# ---------------------------------------------
 @app.get("/fo-dashboard", response_class=HTMLResponse)
 def fo_dashboard(request: Request):
     return templates.TemplateResponse(
