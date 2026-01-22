@@ -6,12 +6,9 @@ def pct(a, b):
 
 def process_intraday_boost(symbol, data):
 
-    ohlc = data.get("ohlc", {})
-    open_p = ohlc.get("open", 0)
-    high_p = ohlc.get("high", 0)
-    low_p = ohlc.get("low", 0)
-    price = data.get("last_price", 0)
-    vwap = data.get("average_price", price)
+    open_p = data.get("open_price", 0)
+high_p = data.get("day_high", 0)
+low_p = data.get("day_low", 0)
 
     if not open_p or not price:
         return None
@@ -35,6 +32,7 @@ def process_intraday_boost(symbol, data):
         "r_factor": r_factor,
         "signal": signal
     }
+
 
 
 
