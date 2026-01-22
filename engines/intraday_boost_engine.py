@@ -1,16 +1,3 @@
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
-IST = ZoneInfo("Asia/Kolkata")
-
-
-def now_hm():
-    return datetime.now(IST).strftime("%H:%M")
-
-
-# -------------------------------------------------
-# BREAKOUT ENGINE (LEFT PANEL)
-# -------------------------------------------------
 def pct(a, b):
     if a == 0:
         return 0
@@ -26,7 +13,6 @@ def process_intraday_boost(symbol, data):
     high_p = ohlc.get("high", 0)
     low_p = ohlc.get("low", 0)
     close_p = data.get("last_price", 0)
-
     vwap = data.get("average_price", close_p)
     volume = data.get("volume", 0)
 
@@ -36,39 +22,21 @@ def process_intraday_boost(symbol, data):
     if not open_p or not close_p:
         return None
 
-    # ---------------------------------
-    # 1️⃣ RANGE + MOVE (SCORE LOGIC)
-    # ---------------------------------
     range_pct = abs(pct(low_p, high_p))
     move_pct = abs(pct(open_p, close_p))
     volume_factor = volume / 300000
-
-    score = (
-        range_pct * 1.2 +
-        move_pct * 1.8 +
-        volume_factor
-    )
-    score = round(score, 2)
-
-    # ---------------------------------
-    # 2️⃣ BUYER / SELLER IMBALANCE
-    # ---------------------------------
     imbalance = (buy_qty - sell_qty) / max((buy_qty + sell_qty), 1)
 
-    # ---------------------------------
-    # 3️⃣ R FACTOR (% ACTIVITY POWER)
-    # ---------------------------------
-    r_factor = (
+    score = round(range_pct * 1.2 + move_pct * 1.8 + volume_factor, 2)
+
+    r_factor = round(
         range_pct * 1.5 +
         move_pct * 2 +
         volume_factor * 2 +
-        abs(imbalance) * 100
+        abs(imbalance) * 100,
+        2
     )
-    r_factor = round(r_factor, 2)
 
-    # ---------------------------------
-    # 4️⃣ SIGNAL
-    # ---------------------------------
     if imbalance > 0 and close_p > vwap:
         signal = "STRONG BULLISH"
     elif imbalance < 0 and close_p < vwap:
@@ -80,9 +48,7 @@ def process_intraday_boost(symbol, data):
 
     return {
         "symbol": symbol,
-        "score": score,         # LEFT COLUMN
-        "r_factor": r_factor,   # SORTING COLUMN (%)
+        "boost": score,
+        "r_factor": r_factor,
         "signal": signal
     }
-
-
