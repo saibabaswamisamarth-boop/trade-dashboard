@@ -1,7 +1,4 @@
-from zoneinfo import ZoneInfo
-
-IST = ZoneInfo("Asia/Kolkata")
-
+# engines/intraday_boost_engine.py
 
 def pct(a, b):
     if a == 0:
@@ -17,36 +14,33 @@ def process_intraday_boost(symbol, data):
     low_p = ohlc.get("low", 0)
     price = data.get("last_price", 0)
     vwap = data.get("average_price", price)
+    volume = data.get("volume", 0)
 
     if not open_p or not price:
         return None
 
-    # -------- RUNNER PART (same as breakout) --------
-    move_from_open = abs(pct(open_p, price))
+    # -------- CORE ACTIVITY MATH --------
+    move_open = abs(pct(open_p, price))      # open पासून किती move
+    range_pct = abs(pct(low_p, high_p))     # full range
+    vwap_dist = abs(pct(vwap, price))       # vwap पासून distance
 
-    if price > open_p:
-        expansion = abs(pct(open_p, high_p))
-        signal = "BULLISH"
-    else:
-        expansion = abs(pct(open_p, low_p))
-        signal = "BEARISH"
-
-    # -------- VWAP POWER --------
-    vwap_dist = abs(pct(vwap, price))
-
-    # -------- FINAL R-FACTOR --------
+    # -------- R-FACTOR (stable, non-random) --------
     r_factor = (
-        move_from_open * 4 +
-        expansion * 4 +
-        vwap_dist * 2
+        move_open * 2 +
+        range_pct * 1.5 +
+        vwap_dist * 2 +
+        (volume / 500000)
     )
     r_factor = round(r_factor, 2)
 
-    boost = round(r_factor / 5, 2)
+    # readable boost score
+    score = round(r_factor / 5, 2)
+
+    signal = "BULLISH" if price > vwap else "BEARISH"
 
     return {
         "symbol": symbol,
-        "score": boost,
-        "r_factor": r_factor,
+        "score": score,        # Boost column
+        "r_factor": r_factor,  # Sorting column
         "signal": signal
     }
