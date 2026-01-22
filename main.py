@@ -1,109 +1,128 @@
-from fastapi import FastAPI
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse
-from fastapi import Request
-from datetime import datetime
-import random
+from fastapi.templating import Jinja2Templates
+from dhanhq import dhanhq
+import os
+from datetime import datetime, date
+
+from engines.intraday_boost_engine import process_intraday_boost
+from stocks_master import FO_STOCKS
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
+DAY_STATE = {
+    "date": date.today().isoformat(),
+    "live_memory": {},
+    "final_snapshot": [],
+    "snapshot_saved": False
+}
 
-# ---------------------------------------------------
-# DUMMY ENGINE (replace later with your real logic)
-# ---------------------------------------------------
+def is_market_closed():
+    return datetime.now().strftime("%H:%M") > "15:30"
 
-def sample_breakout():
-    stocks = [
-        ("OBEROIRLTY", 7, "BEARISH 2.64%"),
-        ("CROMPTON", 7, "BEARISH 2.59%"),
-        ("MUTHOOTFIN", 7, "BEARISH 2.58%"),
-        ("JINDALSTEL", 7, "BULLISH 2.43%"),
-        ("DLF", 7, "BEARISH 2.13%"),
-        ("TATACHEM", 7, "BULLISH 2.08%"),
-        ("TITAN", 7, "BEARISH 2.06%"),
-        ("RECLTD", 6, "BULLISH 1.80%"),
-        ("HINDALCO", 6, "BEARISH 1.65%"),
-        ("AXISBANK", 6, "BULLISH 1.40%"),
-    ]
+def update_day_memory(symbol, score):
+    now = datetime.now()
+    mem = DAY_STATE["live_memory"].get(symbol)
 
-    return [
-        {
-            "symbol": s,
-            "score": sc,
-            "signal": sig
-        } for s, sc, sig in stocks
-    ]
+    if not mem:
+        DAY_STATE["live_memory"][symbol] = {
+            "hits": 1,
+            "first_seen": now,
+            "last_seen": now,
+            "score": score
+        }
+        return score
 
+    mem["hits"] += 1
+    mem["last_seen"] = now
 
-def sample_boost():
-    stocks = [
-        ("RELIANCE", 14, 2.4, "BULLISH"),
-        ("TCS", 13, 1.8, "BULLISH"),
-        ("SBIN", 12, 3.1, "BEARISH"),
-        ("INFY", 11, 1.2, "BULLISH"),
-        ("ITC", 10, 0.9, "BEARISH"),
-    ]
+    if mem["hits"] >= 2:
+        score += 2
+    if score > mem["score"]:
+        score += 2
+    if (now - mem["first_seen"]).seconds > 1800:
+        score += 3
 
-    return [
-        {
-            "symbol": s,
-            "boost": b,
-            "r": r,
-            "signal": sig
-        } for s, b, r, sig in stocks
-    ]
+    mem["score"] = score
+    return score
 
 
-# ---------------------------------------------------
-# ROUTES
-# ---------------------------------------------------
+FO_STOCKS_FULL = FO_STOCKS
+BATCH_SIZE = 200
 
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+def get_batches(stock_dict):
+    items = list(stock_dict.items())
+    return [items[i:i+BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
 
 
-@app.get("/intraday-data")
-def intraday_data():
+def get_dhan_client():
+    client_id = os.getenv("CLIENT_ID")
+    access_token = os.getenv("ACCESS_TOKEN")
+    if not client_id or not access_token:
+        raise Exception("Dhan ENV variables not set")
+    return dhanhq(client_id, access_token)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.get("/intraday-boost")
+def intraday_boost(batch: int = Query(1, ge=1)):
+
+    dhan = get_dhan_client()
+    results = []
+
+    batches = get_batches(FO_STOCKS_FULL)
+    total_batches = len(batches)
+
+    if batch > total_batches:
+        return {"batch": batch, "total_batches": total_batches, "data": []}
+
+    current_batch = batches[batch - 1]
+    index_move_pct = 0
+
+    for symbol, sid in current_batch:
+        try:
+            quote = dhan.quote_data(securities={"NSE_EQ": [sid]})
+            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
+            if str(sid) not in nse:
+                continue
+
+            data = nse[str(sid)]
+            result = process_intraday_boost(symbol, data, index_move_pct)
+
+            if result:
+                final_score = update_day_memory(
+                    result["symbol"],
+                    result["boost_score"]
+                )
+                result["boost_score"] = final_score
+                results.append(result)
+
+        except Exception as e:
+            print(symbol, e)
+
+    results = sorted(results, key=lambda x: x["boost_score"], reverse=True)
+
+    if is_market_closed() and not DAY_STATE["snapshot_saved"]:
+        DAY_STATE["final_snapshot"] = results[:10]
+        DAY_STATE["snapshot_saved"] = True
+
+    data = DAY_STATE["final_snapshot"] if is_market_closed() else results[:10]
+
     return {
-        "breakout": sample_breakout(),
-        "boost": sample_boost()
+        "batch": batch,
+        "total_batches": total_batches,
+        "data": data
     }
 
-# =========================================
-# DASHBOARD COMPATIBLE API (IMPORTANT)
-# =========================================
 
-@app.get("/intraday-data")
-def intraday_data():
-
-    breakout_rows = []
-    boost_rows = []
-
-    # ----- तुझा breakout logic जिथे आहे तिथून data घे -----
-    # उदाहरण (तू replace करशील तुझ्या actual function ने)
-    breakout_data = DAY_STATE.get("breakout_list", [])
-
-    for row in breakout_data[:10]:
-        breakout_rows.append({
-            "symbol": row["symbol"],
-            "score": row["score"],
-            "signal": row["signal"]
-        })
-
-    # ----- तुझा boost logic जिथे आहे तिथून data घे -----
-    boost_data = DAY_STATE.get("boost_list", [])
-
-    for row in boost_data[:10]:
-        boost_rows.append({
-            "symbol": row["symbol"],
-            "boost": row["boost_score"],
-            "r": row["r_factor"],
-            "signal": row["signal"]
-        })
-
-    return {
-        "breakout": breakout_rows,
-        "boost": boost_rows
-    }
+@app.get("/fo-dashboard", response_class=HTMLResponse)
+def fo_dashboard(request: Request):
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {"request": request}
+    )
