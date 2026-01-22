@@ -3,8 +3,7 @@ from zoneinfo import ZoneInfo
 
 IST = ZoneInfo("Asia/Kolkata")
 
-def now_hm():
-    return datetime.now(IST).strftime("%H:%M")
+MORNING_LEADERS = {}
 
 def pct(a, b):
     if a == 0:
@@ -14,34 +13,44 @@ def pct(a, b):
 
 def process_intraday_breakout(symbol, data):
 
+    now = datetime.now(IST).strftime("%H:%M")
+
     ohlc = data.get("ohlc", {})
     open_p = ohlc.get("open", 0)
-    close_p = data.get("last_price", 0)
-    vwap = data.get("average_price", close_p)
+    high_p = ohlc.get("high", 0)
+    low_p = ohlc.get("low", 0)
+    price = data.get("last_price", 0)
+    vwap = data.get("average_price", price)
     volume = data.get("volume", 0)
 
-    if not open_p or not close_p:
+    if not open_p or not price:
         return None
 
-    move_pct = round(pct(open_p, close_p), 2)
+    move_open = pct(open_p, price)
+    range_pct = pct(low_p, high_p)
 
-    if abs(move_pct) < 2:
+    # -------- MORNING LEADER CAPTURE (9:15–9:45) --------
+    if "09:15" <= now <= "09:45":
+        if abs(move_open) > 1.2 and volume > 200000 and price > vwap:
+            MORNING_LEADERS[symbol] = {
+                "break_price": price,
+                "time": now
+            }
+
+    # -------- Only track morning leaders after that --------
+    if symbol not in MORNING_LEADERS:
         return None
 
-    if move_pct > 0 and close_p < vwap:
-        return None
-    if move_pct < 0 and close_p > vwap:
-        return None
+    break_price = MORNING_LEADERS[symbol]["break_price"]
 
-    if volume < 300000:
-        return None
+    rf_pct = pct(break_price, price)
+    score = round(abs(rf_pct)) + 5
 
-    direction = "BULLISH" if move_pct > 0 else "BEARISH"
-    score = int(abs(move_pct)) + 5
+    signal = "BULLISH" if rf_pct > 0 else "BEARISH"
 
     return {
         "symbol": symbol,
         "score": score,
-        "rf_pct": abs(move_pct),
-        "signal": direction
+        "rf_pct": round(abs(rf_pct), 2),
+        "signal": signal
     }
