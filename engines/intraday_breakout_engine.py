@@ -1,3 +1,7 @@
+rom zoneinfo import ZoneInfo
+
+IST = ZoneInfo("Asia/Kolkata")
+
 def pct(a, b):
     if a == 0:
         return 0
