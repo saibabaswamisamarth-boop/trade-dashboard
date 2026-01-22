@@ -3,7 +3,6 @@ from zoneinfo import ZoneInfo
 
 IST = ZoneInfo("Asia/Kolkata")
 
-
 def pct(a, b):
     if a == 0:
         return 0
@@ -18,32 +17,35 @@ def process_intraday_boost(symbol, data):
     low_p = ohlc.get("low", 0)
     price = data.get("last_price", 0)
     vwap = data.get("average_price", price)
-    volume = data.get("volume", 0)
 
     if not open_p or not price:
         return None
 
-    move_open = abs(pct(open_p, price))
-    range_pct = abs(pct(low_p, high_p))
+    # 🔥 RUNNER LOGIC
+    move_from_open = abs(pct(open_p, price))
+
+    if price > open_p:
+        expansion = abs(pct(open_p, high_p))
+        signal = "BULLISH"
+    else:
+        expansion = abs(pct(open_p, low_p))
+        signal = "BEARISH"
+
     vwap_dist = abs(pct(vwap, price))
 
-    # ----- PURE ACTIVITY SCORE -----
+    # 🔥 FINAL R FACTOR
     r_factor = (
-        move_open * 2 +
-        range_pct * 1.5 +
-        vwap_dist * 2 +
-        (volume / 300000)
+        move_from_open * 3 +
+        expansion * 4 +
+        vwap_dist * 2
     )
-
     r_factor = round(r_factor, 2)
 
-    score = round(r_factor / 5, 2)
-
-    signal = "BULLISH" if price > vwap else "BEARISH"
+    boost = round(r_factor / 5, 2)
 
     return {
         "symbol": symbol,
-        "score": score,
+        "score": boost,
         "r_factor": r_factor,
         "signal": signal
     }
