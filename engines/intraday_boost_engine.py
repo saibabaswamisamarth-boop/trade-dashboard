@@ -1,8 +1,45 @@
-def process_intraday_boost(symbol, data, index_move_pct=0, sector_trend=0):
+# engines/intraday_boost_engine.py
 
-    # ==========================
-    # BASIC LIVE DATA
-    # ==========================
+# =================================================
+# INTRADAY BREAKOUT (SAFE PLACEHOLDER)
+# =================================================
+
+def process_intraday_breakout(symbol, data):
+
+    ohlc = data.get("ohlc", {})
+    open_p = ohlc.get("open", 0)
+    high_p = ohlc.get("high", 0)
+    low_p = ohlc.get("low", 0)
+    close_p = data.get("last_price", 0)
+
+    vwap = data.get("average_price", close_p)
+    volume = data.get("volume", 0)
+
+    if not all([open_p, high_p, low_p, close_p]):
+        return None
+
+    # VWAP mandatory
+    if close_p <= vwap:
+        return None
+
+    # Simple breakout condition
+    if close_p > high_p * 0.995 and volume > 300_000:
+        return {
+            "symbol": symbol,
+            "boost_score": 5,
+            "signal": "FORMING",
+            "move_pct": 0.0
+        }
+
+    return None
+
+
+# =================================================
+# INTRADAY BOOST – NEW LOGIC (IMBALANCE BASED)
+# =================================================
+
+def process_intraday_boost(symbol, data):
+
     ohlc = data.get("ohlc", {})
     depth = data.get("depth", {})
 
@@ -18,9 +55,7 @@ def process_intraday_boost(symbol, data, index_move_pct=0, sector_trend=0):
     if not all([open_p, high_p, low_p, close_p]):
         return None
 
-    # ==========================
-    # BUYER / SELLER IMBALANCE
-    # ==========================
+    # BUY / SELL IMBALANCE
     buy_qty = sum(x.get("quantity", 0) for x in depth.get("buy", []))
     sell_qty = sum(x.get("quantity", 0) for x in depth.get("sell", []))
 
@@ -29,98 +64,52 @@ def process_intraday_boost(symbol, data, index_move_pct=0, sector_trend=0):
     else:
         imbalance = buy_qty / sell_qty
 
-    # ==========================
-    # TREND ZONE (HH-HL / LL-LH)
-    # ==========================
-    bullish_structure = close_p > open_p and high_p > open_p
-    bearish_structure = close_p < open_p and low_p < open_p
+    # VWAP FILTER
+    above_vwap = close_p > vwap
+    below_vwap = close_p < vwap
 
-    # ==========================
     # CANDLE STRENGTH
-    # ==========================
     body = abs(close_p - open_p)
     full = high_p - low_p
     if full == 0:
         return None
 
     body_ratio = body / full
-    strong_candle = body_ratio >= 0.65
+    strong_candle = body_ratio >= 0.6
 
-    # ==========================
     # GAP FILTER
-    # ==========================
     gap_pct = abs(open_p - prev_close) / prev_close * 100
-    gap_valid = gap_pct < 2.5 or volume > 1_000_000
+    gap_ok = gap_pct < 2.5 or volume > 1_000_000
 
-    # ==========================
-    # RANGE & VOLATILITY
-    # ==========================
-    today_range_pct = (high_p - low_p) / close_p * 100
-    wild_stock = today_range_pct > 4.5
-
-    # ==========================
-    # VWAP FILTER (MANDATORY)
-    # ==========================
-    above_vwap = close_p > vwap
-    below_vwap = close_p < vwap
-
-    # ==========================
-    # MARKET / SECTOR CONTEXT
-    # ==========================
-    market_support = index_move_pct >= 0
-    sector_support = sector_trend >= 0
-
-    # ==========================
-    # R SCORE (RELATIVE POWER)
-    # ==========================
+    # SCORE (R)
     R = 0
 
-    # imbalance
     if imbalance >= 1.5:
         R += 2
     elif imbalance >= 1.2:
         R += 1
 
-    # trend structure
-    if bullish_structure or bearish_structure:
-        R += 2
-
-    # candle strength
     if strong_candle:
         R += 2
 
-    # vwap
     if above_vwap or below_vwap:
         R += 2
 
-    # gap
-    if gap_valid:
+    if gap_ok:
         R += 1
-
-    # market / sector
-    if market_support:
-        R += 1
-    if sector_support:
-        R += 1
-
-    # wild volatility penalty
-    if wild_stock:
-        R -= 1
 
     if R < 4:
         return None
 
-    # ==========================
-    # DIRECTION & SIGNAL
-    # ==========================
-    if bullish_structure and above_vwap:
+    # DIRECTION
+    if above_vwap and close_p > open_p:
         direction = "BULLISH"
-    elif bearish_structure and below_vwap:
+    elif below_vwap and close_p < open_p:
         direction = "BEARISH"
     else:
         return None
 
-    if R >= 8:
+    if R >= 7:
         signal = f"STRONG {direction}"
     else:
         signal = direction
@@ -130,6 +119,4 @@ def process_intraday_boost(symbol, data, index_move_pct=0, sector_trend=0):
         "boost_score": R,
         "r_factor": round(imbalance, 2),
         "signal": signal,
-        "range_pct": round(today_range_pct, 2),
-        "imbalance": round(imbalance, 2),
     }
