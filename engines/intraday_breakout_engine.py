@@ -1,5 +1,3 @@
-from datetime import datetime
-
 def pct(a, b):
     if a == 0:
         return 0
@@ -8,10 +6,11 @@ def pct(a, b):
 
 def process_intraday_breakout(symbol, data):
 
-    # ✅ CORRECT LIVE FIELDS FROM DHAN
-    open_p = data.get("open_price", 0)
-    high_p = data.get("day_high", 0)
-    low_p = data.get("day_low", 0)
+    ohlc = data.get("ohlc", {})
+
+    open_p = ohlc.get("open", 0)
+    high_p = ohlc.get("high", 0)
+    low_p = ohlc.get("low", 0)
     close_p = data.get("last_price", 0)
 
     if not open_p or not close_p or not high_p or not low_p:
@@ -20,7 +19,6 @@ def process_intraday_breakout(symbol, data):
     move_from_open = abs(pct(open_p, close_p))
     range_pct = abs(pct(low_p, high_p))
 
-    # Direction + Expansion
     if close_p > open_p:
         expansion = abs(pct(open_p, high_p))
         signal = "BULLISH"
@@ -28,7 +26,6 @@ def process_intraday_breakout(symbol, data):
         expansion = abs(pct(open_p, low_p))
         signal = "BEARISH"
 
-    # 🔥 REAL RF %
     rf_pct = (
         move_from_open * 3 +
         expansion * 4 +
