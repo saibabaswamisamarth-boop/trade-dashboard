@@ -1,3 +1,5 @@
+from datetime import datetime
+
 def pct(a, b):
     if a == 0:
         return 0
@@ -6,26 +8,35 @@ def pct(a, b):
 
 def process_intraday_breakout(symbol, data):
 
+    # ✅ CORRECT LIVE FIELDS FROM DHAN
     open_p = data.get("open_price", 0)
-high_p = data.get("day_high", 0)
-low_p = data.get("day_low", 0)
-close_p = data.get("last_price", 0)
-    if not open_p or not price:
+    high_p = data.get("day_high", 0)
+    low_p = data.get("day_low", 0)
+    close_p = data.get("last_price", 0)
+
+    if not open_p or not close_p or not high_p or not low_p:
         return None
 
-    move = abs(pct(open_p, price))          # real move %
-    range_pct = abs(pct(low_p, high_p))    # full day range %
+    move_from_open = abs(pct(open_p, close_p))
+    range_pct = abs(pct(low_p, high_p))
 
-    if price >= open_p:
+    # Direction + Expansion
+    if close_p > open_p:
+        expansion = abs(pct(open_p, high_p))
         signal = "BULLISH"
     else:
+        expansion = abs(pct(open_p, low_p))
         signal = "BEARISH"
 
-    # 🔥 Correct RF calculation (ratio, not addition)
-    rf_pct = (move / max(range_pct, 0.01)) * 100
-    rf_pct = round(rf_pct, 2)
+    # 🔥 REAL RF %
+    rf_pct = (
+        move_from_open * 3 +
+        expansion * 4 +
+        range_pct * 1.5
+    )
 
-    score = round(move, 2)
+    rf_pct = round(rf_pct, 2)
+    score = round(rf_pct / 10, 1)
 
     return {
         "symbol": symbol,
@@ -33,5 +44,3 @@ close_p = data.get("last_price", 0)
         "rf_pct": rf_pct,
         "signal": signal
     }
-
-
