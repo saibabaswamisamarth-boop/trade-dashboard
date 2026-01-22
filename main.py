@@ -15,7 +15,7 @@ IST = ZoneInfo("Asia/Kolkata")
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# ---------------- SMART DAY MEMORY ----------------
+# -------- SMART DAY MEMORY --------
 DAY_DATE = date.today().isoformat()
 DAY_BREAKOUT_MEMORY = {}
 DAY_BOOST_MEMORY = {}
@@ -28,14 +28,14 @@ def reset_day():
         DAY_BREAKOUT_MEMORY = {}
         DAY_BOOST_MEMORY = {}
 
-# ---------------- DHAN ----------------
+# -------- DHAN --------
 def get_dhan_client():
     return dhanhq(
         os.getenv("CLIENT_ID"),
         os.getenv("ACCESS_TOKEN")
     )
 
-# ---------------- MAIN API ----------------
+# -------- MAIN API --------
 @app.get("/intraday-data")
 def intraday_data():
 
@@ -43,39 +43,24 @@ def intraday_data():
     dhan = get_dhan_client()
 
     for symbol, sid in FO_STOCKS.items():
-    try:
-        quote = dhan.quote_data(securities={"NSE_EQ": [sid]})
-        nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
-        if str(sid) not in nse:
-            continue
+        try:
+            quote = dhan.quote_data(securities={"NSE_EQ": [sid]})
+            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
+            if str(sid) not in nse:
+                continue
 
-        data = nse[str(sid)]
-
-        # ---------------- BREAKOUT ----------------
-        b1 = process_intraday_breakout(symbol, data)
-        if b1:
-            DAY_STATE["breakout"][symbol] = b1
-
-        # ---------------- BOOST ----------------
-        b2 = process_intraday_boost(symbol, data)
-        if b2:
-            DAY_STATE["boost"][symbol] = b2
-
-    except Exception as e:
-        continue
-
+            data = nse[str(sid)]
 
             # -------- BREAKOUT SMART LOCK --------
             b1 = process_intraday_breakout(symbol, data)
             if b1:
-                sym = b1["symbol"]
                 rf = b1["rf_pct"]
 
-                if sym in DAY_BREAKOUT_MEMORY:
-                    DAY_BREAKOUT_MEMORY[sym] = b1
+                if symbol in DAY_BREAKOUT_MEMORY:
+                    DAY_BREAKOUT_MEMORY[symbol] = b1
 
                 elif len(DAY_BREAKOUT_MEMORY) < 10:
-                    DAY_BREAKOUT_MEMORY[sym] = b1
+                    DAY_BREAKOUT_MEMORY[symbol] = b1
 
                 else:
                     weakest = min(
@@ -84,19 +69,18 @@ def intraday_data():
                     )
                     if rf > weakest[1]["rf_pct"]:
                         del DAY_BREAKOUT_MEMORY[weakest[0]]
-                        DAY_BREAKOUT_MEMORY[sym] = b1
+                        DAY_BREAKOUT_MEMORY[symbol] = b1
 
             # -------- BOOST SMART LOCK --------
             b2 = process_intraday_boost(symbol, data)
             if b2:
-                sym = b2["symbol"]
                 rf = b2["r_factor"]
 
-                if sym in DAY_BOOST_MEMORY:
-                    DAY_BOOST_MEMORY[sym] = b2
+                if symbol in DAY_BOOST_MEMORY:
+                    DAY_BOOST_MEMORY[symbol] = b2
 
                 elif len(DAY_BOOST_MEMORY) < 10:
-                    DAY_BOOST_MEMORY[sym] = b2
+                    DAY_BOOST_MEMORY[symbol] = b2
 
                 else:
                     weakest = min(
@@ -105,7 +89,7 @@ def intraday_data():
                     )
                     if rf > weakest[1]["r_factor"]:
                         del DAY_BOOST_MEMORY[weakest[0]]
-                        DAY_BOOST_MEMORY[sym] = b2
+                        DAY_BOOST_MEMORY[symbol] = b2
 
         except:
             continue
@@ -128,11 +112,10 @@ def intraday_data():
         "time": datetime.now(IST).strftime("%I:%M:%S %p")
     }
 
-# ---------------- DASHBOARD ----------------
+# -------- DASHBOARD --------
 @app.get("/fo-dashboard", response_class=HTMLResponse)
 def fo_dashboard(request: Request):
     return templates.TemplateResponse(
         "fo_dashboard.html",
         {"request": request}
     )
-
