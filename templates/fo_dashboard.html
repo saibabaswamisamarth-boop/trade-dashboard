@@ -3,45 +3,15 @@
 <head>
     <title>Intraday Market Pulse</title>
     <style>
-        body{
-            background:#0b1622;
-            color:white;
-            font-family:Arial;
-        }
-        .container{
-            display:flex;
-            gap:20px;
-        }
-        .panel{
-            flex:1;
-            border:1px solid #2a3b4d;
-            padding:15px;
-            border-radius:10px;
-            background:#0f1f2e;
-        }
-        table{
-            width:100%;
-            border-collapse:collapse;
-        }
-        th,td{
-            padding:8px;
-            border-bottom:1px solid #2a3b4d;
-            text-align:left;
-        }
-        th{
-            color:#7fb3ff;
-        }
-        .bullish{
-            color:#00ff88;
-            font-weight:700;
-        }
-        .bearish{
-            color:#ff4d4d;
-            font-weight:700;
-        }
-        a{
-            color:#7fb3ff;
-        }
+        body{background:#0b1622;color:white;font-family:Arial;}
+        .container{display:flex;gap:20px;}
+        .panel{flex:1;border:1px solid #2a3b4d;padding:15px;border-radius:10px;background:#0f1f2e;}
+        table{width:100%;border-collapse:collapse;}
+        th,td{padding:8px;border-bottom:1px solid #2a3b4d;text-align:left;}
+        th{color:#7fb3ff;}
+        .bullish{color:#00ff88;font-weight:700;}
+        .bearish{color:#ff4d4d;font-weight:700;}
+        a{color:#7fb3ff;}
     </style>
 </head>
 <body>
@@ -51,101 +21,75 @@
 
 <div class="container">
 
-    <!-- INTRADAY BREAKOUT -->
-    <div class="panel">
-        <h2>🟡 INTRADAY BREAKOUT</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th>Score</th>
-                    <th>Signal</th>
-                    <th>Chart</th>
-                </tr>
-            </thead>
-            <tbody id="breakout-body"></tbody>
-        </table>
-    </div>
+<div class="panel">
+<h2>🟡 INTRADAY BREAKOUT</h2>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Score</th>
+<th>Signal</th>
+<th>Chart</th>
+</tr>
+</thead>
+<tbody id="breakout-body"></tbody>
+</table>
+</div>
 
-    <!-- INTRADAY BOOST -->
-    <div class="panel">
-        <h2>🟢 INTRADAY BOOST</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th>Boost</th>
-                    <th>Signal</th>
-                    <th>Chart</th>
-                </tr>
-            </thead>
-            <tbody id="boost-body"></tbody>
-        </table>
-    </div>
+<div class="panel">
+<h2>🟢 INTRADAY BOOST</h2>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Boost</th>
+<th>R-Factor</th>
+<th>Signal</th>
+<th>Chart</th>
+</tr>
+</thead>
+<tbody id="boost-body"></tbody>
+</table>
+</div>
 
 </div>
 
 <script>
-function getClass(signal){
-    if(signal.includes("BULLISH")) return "bullish";
-    if(signal.includes("BEARISH")) return "bearish";
-    return "";
+function cls(s){return s.includes("BULLISH")?"bullish":"bearish";}
+function link(s){return `https://www.tradingview.com/chart/?symbol=NSE:${s}`;}
+
+async function load(){
+ const r=await fetch('/intraday-data');
+ const j=await r.json();
+
+ let b="",bo="";
+
+ j.breakout.forEach(x=>{
+  b+=`<tr>
+  <td class="${cls(x.signal)}">${x.symbol}</td>
+  <td>${x.score}</td>
+  <td class="${cls(x.signal)}">${x.signal}</td>
+  <td><a target="_blank" href="${link(x.symbol)}">View</a></td>
+  </tr>`;
+ });
+
+ j.boost.forEach(x=>{
+  bo+=`<tr>
+  <td class="${cls(x.signal)}">${x.symbol}</td>
+  <td>${x.boost}</td>
+  <td>${x.r_factor}</td>
+  <td class="${cls(x.signal)}">${x.signal}</td>
+  <td><a target="_blank" href="${link(x.symbol)}">View</a></td>
+  </tr>`;
+ });
+
+ document.getElementById("breakout-body").innerHTML=b;
+ document.getElementById("boost-body").innerHTML=bo;
+ document.getElementById("time").innerText=j.time;
 }
 
-function chartLink(symbol){
-    return `https://www.tradingview.com/chart/?symbol=NSE:${symbol}`;
-}
-
-async function loadBreakout(){
-    const res = await fetch('/intraday-breakout');
-    const json = await res.json();
-    const rows = json.data || [];
-
-    let html = "";
-    rows.forEach(row=>{
-        const cls = getClass(row.signal);
-        html += `
-            <tr>
-                <td class="${cls}">${row.symbol}</td>
-                <td>${row.score}</td>
-                <td class="${cls}">${row.signal}</td>
-                <td><a target="_blank" href="${chartLink(row.symbol)}">View</a></td>
-            </tr>
-        `;
-    });
-
-    document.getElementById("breakout-body").innerHTML = html;
-}
-
-async function loadBoost(){
-    const res = await fetch('/intraday-boost');
-    const json = await res.json();
-    const rows = json.data || [];
-
-    let html = "";
-    rows.forEach(row=>{
-        const cls = getClass(row.signal);
-        html += `
-            <tr>
-                <td class="${cls}">${row.symbol}</td>
-                <td>${row.boost_score}</td>
-                <td class="${cls}">${row.signal}</td>
-                <td><a target="_blank" href="${chartLink(row.symbol)}">View</a></td>
-            </tr>
-        `;
-    });
-
-    document.getElementById("boost-body").innerHTML = html;
-}
-
-async function loadAll(){
-    await loadBreakout();
-    await loadBoost();
-    document.getElementById("time").innerText = new Date().toLocaleTimeString();
-}
-
-loadAll();
-setInterval(loadAll, 15000);
+load();
+setInterval(load,15000);
 </script>
 
 </body>
