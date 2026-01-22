@@ -35,6 +35,10 @@ DAY_STATE = {
 def is_market_closed():
     return datetime.now().strftime("%H:%M") >= "15:30"
 
+def is_early_market():
+    now = datetime.now().strftime("%H:%M")
+    return "09:15" <= now <= "09:35"
+
 def update_day_memory(symbol, score):
     now = datetime.now()
     mem = DAY_STATE["live_memory"].get(symbol)
@@ -135,11 +139,13 @@ def health():
 def intraday_boost(batch: int = Query(1, ge=1)):
     global CACHED_RESPONSE
 
-    # ⚡ CACHE HIT
-    if not should_run_engine() and CACHED_RESPONSE:
-        return CACHED_RESPONSE
+    # ⚡ CACHE LOGIC
+    # Early market मध्ये cache वापरू नको (fresh scan each time)
+    if not is_early_market():
+        if not should_run_engine() and CACHED_RESPONSE:
+            return CACHED_RESPONSE
 
-    print("⚙️ Running Intraday Engine")
+    print("⚙️ Running Intraday Engine | Early Market:", is_early_market())
 
     dhan = get_dhan_client()
     candidates = []   # LEFT PANEL – INTRADAY BREAKOUT
@@ -152,7 +158,7 @@ def intraday_boost(batch: int = Query(1, ge=1)):
         return {"data": {"candidates": [], "boosted": []}}
 
     current_batch = batches[batch - 1]
-    index_move_pct = 0  # (future: NIFTY strength)
+    index_move_pct = 0  # future use (NIFTY strength)
 
     for symbol, sid in current_batch:
         try:
@@ -206,13 +212,14 @@ def intraday_boost(batch: int = Query(1, ge=1)):
             DAY_STATE["final_snapshot"] = boosted
             DAY_STATE["snapshot_saved"] = True
         boosted = DAY_STATE["final_snapshot"]
-        candidates = []  # market close ला breakout list hide
+        candidates = []  # market close ला breakout hide
 
     # -------------------------
     # CACHE RESPONSE
     # -------------------------
     CACHED_RESPONSE = {
         "generated_at": datetime.now().strftime("%H:%M:%S"),
+        "early_market": is_early_market(),
         "data": {
             "candidates": candidates,
             "boosted": boosted
