@@ -70,3 +70,40 @@ def intraday_data():
         "breakout": sample_breakout(),
         "boost": sample_boost()
     }
+
+# =========================================
+# DASHBOARD COMPATIBLE API (IMPORTANT)
+# =========================================
+
+@app.get("/intraday-data")
+def intraday_data():
+
+    breakout_rows = []
+    boost_rows = []
+
+    # ----- तुझा breakout logic जिथे आहे तिथून data घे -----
+    # उदाहरण (तू replace करशील तुझ्या actual function ने)
+    breakout_data = DAY_STATE.get("breakout_list", [])
+
+    for row in breakout_data[:10]:
+        breakout_rows.append({
+            "symbol": row["symbol"],
+            "score": row["score"],
+            "signal": row["signal"]
+        })
+
+    # ----- तुझा boost logic जिथे आहे तिथून data घे -----
+    boost_data = DAY_STATE.get("boost_list", [])
+
+    for row in boost_data[:10]:
+        boost_rows.append({
+            "symbol": row["symbol"],
+            "boost": row["boost_score"],
+            "r": row["r_factor"],
+            "signal": row["signal"]
+        })
+
+    return {
+        "breakout": breakout_rows,
+        "boost": boost_rows
+    }
