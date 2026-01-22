@@ -15,7 +15,7 @@ IST = ZoneInfo("Asia/Kolkata")
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# -------- SMART DAY MEMORY --------
+# ---------------- SMART DAY MEMORY ----------------
 DAY_DATE = date.today().isoformat()
 DAY_BREAKOUT_MEMORY = {}
 DAY_BOOST_MEMORY = {}
@@ -28,14 +28,14 @@ def reset_day():
         DAY_BREAKOUT_MEMORY = {}
         DAY_BOOST_MEMORY = {}
 
-# -------- DHAN --------
+# ---------------- DHAN ----------------
 def get_dhan_client():
     return dhanhq(
         os.getenv("CLIENT_ID"),
         os.getenv("ACCESS_TOKEN")
     )
 
-# -------- MAIN API --------
+# ---------------- MAIN API ----------------
 @app.get("/intraday-data")
 def intraday_data():
 
@@ -51,9 +51,9 @@ def intraday_data():
 
             data = nse[str(sid)]
 
-            # -------- BREAKOUT SMART LOCK --------
+            # -------- BREAKOUT --------
             b1 = process_intraday_breakout(symbol, data)
-            if b1:
+            if b1 and "rf_pct" in b1:
                 rf = b1["rf_pct"]
 
                 if symbol in DAY_BREAKOUT_MEMORY:
@@ -71,9 +71,9 @@ def intraday_data():
                         del DAY_BREAKOUT_MEMORY[weakest[0]]
                         DAY_BREAKOUT_MEMORY[symbol] = b1
 
-            # -------- BOOST SMART LOCK --------
+            # -------- BOOST --------
             b2 = process_intraday_boost(symbol, data)
-            if b2:
+            if b2 and "r_factor" in b2:
                 rf = b2["r_factor"]
 
                 if symbol in DAY_BOOST_MEMORY:
@@ -91,9 +91,10 @@ def intraday_data():
                         del DAY_BOOST_MEMORY[weakest[0]]
                         DAY_BOOST_MEMORY[symbol] = b2
 
-        except:
+        except Exception:
             continue
 
+    # -------- FINAL SORTING --------
     breakout_list = sorted(
         DAY_BREAKOUT_MEMORY.values(),
         key=lambda x: x["rf_pct"],
@@ -112,7 +113,7 @@ def intraday_data():
         "time": datetime.now(IST).strftime("%I:%M:%S %p")
     }
 
-# -------- DASHBOARD --------
+# ---------------- DASHBOARD ----------------
 @app.get("/fo-dashboard", response_class=HTMLResponse)
 def fo_dashboard(request: Request):
     return templates.TemplateResponse(
