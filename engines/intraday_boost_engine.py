@@ -5,8 +5,9 @@ IST = ZoneInfo("Asia/Kolkata")
 def pct(a, b):
     if a == 0:
         return 0
-    return ((b - a) / a) * 10
-    
+    return ((b - a) / a) * 100
+
+
 def process_intraday_boost(symbol, data):
 
     ohlc = data.get("ohlc", {})
@@ -15,7 +16,6 @@ def process_intraday_boost(symbol, data):
     low_p = ohlc.get("low", 0)
     price = data.get("last_price", 0)
     vwap = data.get("average_price", price)
-    volume = data.get("volume", 0)
 
     if not open_p or not price:
         return None
@@ -24,9 +24,9 @@ def process_intraday_boost(symbol, data):
     range_pct = abs(pct(low_p, high_p))
     vwap_dist = abs(pct(vwap, price))
 
-    activity = move + range_pct + vwap_dist
+    activity = move + vwap_dist
 
-    # 🔥 REAL R FACTOR %
+    # 🔥 Correct R-Factor (ratio)
     r_factor = (activity / max(range_pct, 0.01)) * 100
     r_factor = round(r_factor, 2)
 
@@ -39,4 +39,5 @@ def process_intraday_boost(symbol, data):
         "r_factor": r_factor,
         "signal": signal
     }
+
 
