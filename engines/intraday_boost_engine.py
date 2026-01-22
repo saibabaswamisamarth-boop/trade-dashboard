@@ -1,7 +1,3 @@
-from zoneinfo import ZoneInfo
-
-IST = ZoneInfo("Asia/Kolkata")
-
 def pct(a, b):
     if a == 0:
         return 0
@@ -39,5 +35,6 @@ def process_intraday_boost(symbol, data):
         "r_factor": r_factor,
         "signal": signal
     }
+
 
 
