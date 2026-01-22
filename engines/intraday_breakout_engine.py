@@ -1,11 +1,7 @@
-from zoneinfo import ZoneInfo
-
-IST = ZoneInfo("Asia/Kolkata")
-
 def pct(a, b):
     if a == 0:
         return 0
-    return ((b - a) / a) * 10
+    return ((b - a) / a) * 100
 
 
 def process_intraday_breakout(symbol, data):
@@ -14,26 +10,24 @@ def process_intraday_breakout(symbol, data):
     open_p = ohlc.get("open", 0)
     high_p = ohlc.get("high", 0)
     low_p = ohlc.get("low", 0)
-    close_p = data.get("last_price", 0)
+    price = data.get("last_price", 0)
 
-    if not open_p or not close_p:
+    if not open_p or not price:
         return None
 
-    move_from_open = abs(pct(open_p, close_p))
-    full_range = abs(pct(low_p, high_p))
+    move = abs(pct(open_p, price))          # real move %
+    range_pct = abs(pct(low_p, high_p))    # full day range %
 
-    if close_p > open_p:
-        expansion = abs(pct(open_p, high_p))
+    if price >= open_p:
         signal = "BULLISH"
     else:
-        expansion = abs(pct(open_p, low_p))
         signal = "BEARISH"
 
-    # 🔥 REAL RF %
-    rf_pct = (move_from_open / max(full_range, 0.01)) * 100
+    # 🔥 Correct RF calculation (ratio, not addition)
+    rf_pct = (move / max(range_pct, 0.01)) * 100
     rf_pct = round(rf_pct, 2)
 
-    score = round(move_from_open, 1)
+    score = round(move, 2)
 
     return {
         "symbol": symbol,
@@ -41,6 +35,3 @@ def process_intraday_breakout(symbol, data):
         "rf_pct": rf_pct,
         "signal": signal
     }
-
-
-
