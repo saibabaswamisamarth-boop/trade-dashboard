@@ -11,6 +11,9 @@ from stocks_master import FO_STOCKS
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
+# -----------------------------
+# DAY MEMORY (SUSTAIN LOGIC)
+# -----------------------------
 DAY_STATE = {
     "date": date.today().isoformat(),
     "live_memory": {},
@@ -37,6 +40,7 @@ def update_day_memory(symbol, score):
     mem["hits"] += 1
     mem["last_seen"] = now
 
+    # sustain bonus
     if mem["hits"] >= 2:
         score += 2
     if score > mem["score"]:
@@ -48,6 +52,9 @@ def update_day_memory(symbol, score):
     return score
 
 
+# -----------------------------
+# STOCK BATCHING
+# -----------------------------
 FO_STOCKS_FULL = FO_STOCKS
 BATCH_SIZE = 200
 
@@ -56,6 +63,9 @@ def get_batches(stock_dict):
     return [items[i:i+BATCH_SIZE] for i in range(0, len(items), BATCH_SIZE)]
 
 
+# -----------------------------
+# DHAN CLIENT
+# -----------------------------
 def get_dhan_client():
     client_id = os.getenv("CLIENT_ID")
     access_token = os.getenv("ACCESS_TOKEN")
@@ -64,6 +74,9 @@ def get_dhan_client():
     return dhanhq(client_id, access_token)
 
 
+# -----------------------------
+# ROUTES
+# -----------------------------
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -82,7 +95,6 @@ def intraday_boost(batch: int = Query(1, ge=1)):
         return {"batch": batch, "total_batches": total_batches, "data": []}
 
     current_batch = batches[batch - 1]
-    index_move_pct = 0
 
     for symbol, sid in current_batch:
         try:
@@ -92,7 +104,9 @@ def intraday_boost(batch: int = Query(1, ge=1)):
                 continue
 
             data = nse[str(sid)]
-            result = process_intraday_boost(symbol, data, index_move_pct)
+
+            # 🔥 R-FACTOR ENGINE CALL
+            result = process_intraday_boost(symbol, data)
 
             if result:
                 final_score = update_day_memory(
@@ -105,8 +119,10 @@ def intraday_boost(batch: int = Query(1, ge=1)):
         except Exception as e:
             print(symbol, e)
 
+    # 🔥 SORTING BY R-FACTOR / BOOST SCORE
     results = sorted(results, key=lambda x: x["boost_score"], reverse=True)
 
+    # 🔒 Market close snapshot
     if is_market_closed() and not DAY_STATE["snapshot_saved"]:
         DAY_STATE["final_snapshot"] = results[:10]
         DAY_STATE["snapshot_saved"] = True
