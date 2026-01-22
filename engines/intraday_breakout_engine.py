@@ -2,7 +2,6 @@ from zoneinfo import ZoneInfo
 
 IST = ZoneInfo("Asia/Kolkata")
 
-
 def pct(a, b):
     if a == 0:
         return 0
@@ -20,12 +19,9 @@ def process_intraday_breakout(symbol, data):
     if not open_p or not price:
         return None
 
-    # ---------------- RUNNER LOGIC ----------------
-
-    # Open पासून किती पळाला
+    # ---- RUNNER LOGIC ----
     move_from_open = abs(pct(open_p, price))
 
-    # Open पासून कुठे expand झाला
     if price > open_p:
         expansion = abs(pct(open_p, high_p))
         signal = "BULLISH"
@@ -33,11 +29,9 @@ def process_intraday_breakout(symbol, data):
         expansion = abs(pct(open_p, low_p))
         signal = "BEARISH"
 
-    # 🔥 FINAL RF %
     rf_pct = (move_from_open * 5) + (expansion * 5)
     rf_pct = round(rf_pct, 2)
 
-    # Score readable ठेवण्यासाठी
     score = round(rf_pct / 10, 0)
 
     return {
