@@ -99,56 +99,49 @@ function chartLink(symbol){
 }
 
 async function loadBreakout(){
-    const res = await fetch('/intraday-breakout');
-    const json = await res.json();
-    const rows = json.data || [];
+    const res = await fetch('/intraday-data');
+const json = await res.json();
 
-    let html = "";
-    rows.forEach(row=>{
-        const cls = getClass(row.signal);
-        html += `
-            <tr>
-                <td class="${cls}">${row.symbol}</td>
-                <td>${row.score}</td>
-                <td class="${cls}">${row.signal}</td>
-                <td><a target="_blank" href="${chartLink(row.symbol)}">View</a></td>
-            </tr>
-        `;
-    });
+const breakout = json.breakout || [];
+const boost = json.boost || [];
 
-    document.getElementById("breakout-body").innerHTML = html;
-}
+let bhtml = "";
+breakout.forEach(row=>{
+    const cls = row.signal.includes("BULLISH") ? "bullish" : "bearish";
+    bhtml += `
+        <tr>
+            <td class="${cls}">${row.symbol}</td>
+            <td>${row.score}</td>
+            <td class="${cls}">${row.signal}</td>
+            <td>
+                <a target="_blank"
+                href="https://www.tradingview.com/chart/?symbol=NSE:${row.symbol}">
+                View</a>
+            </td>
+        </tr>
+    `;
+});
+document.getElementById("breakout-body").innerHTML = bhtml;
 
-async function loadBoost(){
-    const res = await fetch('/intraday-boost');
-    const json = await res.json();
-    const rows = json.data || [];
 
-    let html = "";
-    rows.forEach(row=>{
-        const cls = getClass(row.signal);
-        html += `
-            <tr>
-                <td class="${cls}">${row.symbol}</td>
-                <td>${row.boost_score}</td>
-                <td class="${cls}">${row.signal}</td>
-                <td><a target="_blank" href="${chartLink(row.symbol)}">View</a></td>
-            </tr>
-        `;
-    });
+let bohtml = "";
+boost.forEach(row=>{
+    const cls = row.signal.includes("BULLISH") ? "bullish" : "bearish";
+    bohtml += `
+        <tr>
+            <td class="${cls}">${row.symbol}</td>
+            <td>${row.boost}</td>
+            <td>${row.r_factor}</td>
+            <td class="${cls}">${row.signal}</td>
+            <td>
+                <a target="_blank"
+                href="https://www.tradingview.com/chart/?symbol=NSE:${row.symbol}">
+                View</a>
+            </td>
+        </tr>
+    `;
+});
+document.getElementById("boost-body").innerHTML = bohtml;
 
-    document.getElementById("boost-body").innerHTML = html;
-}
+document.getElementById("time").innerText = json.time;
 
-async function loadAll(){
-    await loadBreakout();
-    await loadBoost();
-    document.getElementById("time").innerText = new Date().toLocaleTimeString();
-}
-
-loadAll();
-setInterval(loadAll, 15000);
-</script>
-
-</body>
-</html>
