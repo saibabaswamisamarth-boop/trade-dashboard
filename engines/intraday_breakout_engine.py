@@ -13,8 +13,6 @@ def pct(a, b):
 
 def process_intraday_breakout(symbol, data):
 
-    now = datetime.now(IST).strftime("%H:%M")
-
     ohlc = data.get("ohlc", {})
     open_p = ohlc.get("open", 0)
     high_p = ohlc.get("high", 0)
@@ -26,8 +24,22 @@ def process_intraday_breakout(symbol, data):
     if not open_p or not price:
         return None
 
-    move_open = pct(open_p, price)
-    range_pct = pct(low_p, high_p)
+    move_open = abs(((price - open_p) / open_p) * 100)
+    range_pct = abs(((high_p - low_p) / low_p) * 100)
+
+    rf_pct = round(move_open + range_pct, 2)
+
+    score = int(rf_pct // 1)
+
+    signal = "BULLISH" if price > vwap else "BEARISH"
+
+    return {
+        "symbol": symbol,
+        "score": score,
+        "rf_pct": rf_pct,
+        "signal": signal
+    }
+
 
     # -------- MORNING LEADER CAPTURE (9:15–9:45) --------
     if "09:15" <= now <= "09:45":
@@ -54,3 +66,4 @@ def process_intraday_breakout(symbol, data):
         "rf_pct": round(abs(rf_pct), 2),
         "signal": signal
     }
+
