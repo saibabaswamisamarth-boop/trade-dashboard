@@ -1,7 +1,7 @@
-from datetime import datetime
 from zoneinfo import ZoneInfo
 
 IST = ZoneInfo("Asia/Kolkata")
+
 
 def pct(a, b):
     if a == 0:
@@ -21,7 +21,7 @@ def process_intraday_boost(symbol, data):
     if not open_p or not price:
         return None
 
-    # 🔥 RUNNER LOGIC
+    # -------- RUNNER PART (same as breakout) --------
     move_from_open = abs(pct(open_p, price))
 
     if price > open_p:
@@ -31,14 +31,14 @@ def process_intraday_boost(symbol, data):
         expansion = abs(pct(open_p, low_p))
         signal = "BEARISH"
 
+    # -------- VWAP POWER --------
     vwap_dist = abs(pct(vwap, price))
 
-    # 🔥 FINAL R FACTOR
+    # -------- FINAL R-FACTOR --------
     r_factor = (
-        move_from_open * 3 +
+        move_from_open * 4 +
         expansion * 4 +
-        rf_pct = (move_from_open * 5) + (expansion * 5)
-
+        vwap_dist * 2
     )
     r_factor = round(r_factor, 2)
 
@@ -50,4 +50,3 @@ def process_intraday_boost(symbol, data):
         "r_factor": r_factor,
         "signal": signal
     }
-
