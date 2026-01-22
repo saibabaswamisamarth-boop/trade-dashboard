@@ -59,7 +59,7 @@ def load_snapshot_from_file():
         return []
 
 # =========================
-# DAY MEMORY (LEVEL 3)
+# DAY MEMORY
 # =========================
 
 DAY_STATE = {
@@ -102,12 +102,12 @@ def update_day_memory(symbol, score):
     return score
 
 # =========================
-# SPEED + CACHE
+# CACHE
 # =========================
 
 LAST_ENGINE_RUN = None
 CACHED_RESPONSE = None
-ENGINE_INTERVAL_SEC = 120  # 2 minutes
+ENGINE_INTERVAL_SEC = 120
 
 def should_run_engine():
     global LAST_ENGINE_RUN
@@ -124,7 +124,7 @@ def should_run_engine():
     return False
 
 # =========================
-# SIGNAL LABEL (BOOST)
+# SIGNAL LABEL
 # =========================
 
 def elite_signal(score):
@@ -177,54 +177,56 @@ def intraday_boost(batch: int = Query(1, ge=1)):
 
     now_hm = now_ist_hm()
 
-    # -------- PRE-MARKET (Before 09:15) --------
+    # -------- PRE-MARKET --------
     if now_hm < "09:15":
-        last_data = load_snapshot_from_file()
         return {
             "generated_at": now_ist_str(),
             "market_status": "CLOSED",
             "data": {
                 "candidates": [],
-                "boosted": last_data
+                "boosted": load_snapshot_from_file()
             }
         }
 
-    # -------- CACHE LOGIC --------
+    # -------- CACHE --------
     if not is_early_market():
         if not should_run_engine() and CACHED_RESPONSE:
             return CACHED_RESPONSE
 
-    print("⚙️ Running Intraday Engine | IST:", now_hm)
-
     dhan = get_dhan_client()
-    candidates = []   # LEFT – INTRADAY BREAKOUT
-    boosted = []      # RIGHT – INTRADAY BOOST
+    candidates = []
+    boosted = []
 
     batches = get_batches(FO_STOCKS_FULL)
-    total_batches = len(batches)
-
-    if batch > total_batches:
+    if batch > len(batches):
         return {"data": {"candidates": [], "boosted": []}}
 
     current_batch = batches[batch - 1]
-    index_move_pct = 0  # future use
+    index_move_pct = 0
 
     for symbol, sid in current_batch:
         try:
             quote = dhan.quote_data(securities={"NSE_EQ": [sid]})
-            nse = quote.get("data", {}).get("NSE_EQ", {})
+
+            # ✅ FINAL CORRECT DATA PATH
+            nse = (
+                quote
+                .get("data", {})
+                .get("data", {})
+                .get("NSE_EQ", {})
+            )
 
             if str(sid) not in nse:
                 continue
 
             data = nse[str(sid)]
 
-            # LEFT: BREAKOUT
+            # LEFT PANEL
             breakout = process_intraday_breakout(symbol, data, index_move_pct)
             if breakout:
                 candidates.append(breakout)
 
-            # RIGHT: BOOST
+            # RIGHT PANEL
             boost = process_intraday_boost(symbol, data, index_move_pct)
             if boost:
                 final_score = update_day_memory(
@@ -238,7 +240,6 @@ def intraday_boost(batch: int = Query(1, ge=1)):
         except Exception as e:
             print("ERROR:", symbol, e)
 
-    # -------- SORT + TOP 10 --------
     candidates = sorted(
         candidates, key=lambda x: x["boost_score"], reverse=True
     )[:10]
@@ -257,7 +258,6 @@ def intraday_boost(batch: int = Query(1, ge=1)):
         boosted = DAY_STATE["final_snapshot"]
         candidates = []
 
-    # -------- CACHE RESPONSE --------
     CACHED_RESPONSE = {
         "generated_at": now_ist_str(),
         "market_status": "LIVE",
