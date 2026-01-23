@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from dhanhq import dhanhq
 import os
 from zoneinfo import ZoneInfo
-from datetime import datetime
+from datetime import datetime, time
 
 from engines.intraday_breakout_engine import process_intraday_breakout
 from engines.intraday_boost_engine import process_intraday_boost
@@ -15,6 +15,10 @@ IST = ZoneInfo("Asia/Kolkata")
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
+# 🔒 DAY MEMORY (SUSTAINED)
+DAY_BREAKOUT = {}
+DAY_BOOST = {}
+
 
 def get_dhan_client():
     return dhanhq(
@@ -23,13 +27,33 @@ def get_dhan_client():
     )
 
 
+def within_selection_window(now):
+    return time(9, 20) <= now.time() <= time(9, 25)
+
+
+def try_replace(memory, candidate, key_name):
+    """
+    Replace weakest stock if candidate is stronger
+    """
+    if len(memory) < 10:
+        memory[candidate["symbol"]] = candidate
+        return
+
+    weakest = min(
+        memory.values(),
+        key=lambda x: abs(x[key_name])
+    )
+
+    if abs(candidate[key_name]) > abs(weakest[key_name]):
+        del memory[weakest["symbol"]]
+        memory[candidate["symbol"]] = candidate
+
+
 @app.get("/intraday-data")
 def intraday_data():
 
     dhan = get_dhan_client()
-
-    BREAKOUT_LIST = []
-    BOOST_LIST = []
+    now = datetime.now(IST)
 
     for symbol, sid in FO_STOCKS.items():
         try:
@@ -40,41 +64,41 @@ def intraday_data():
 
             data = nse[str(sid)]
 
-            # -------- INTRADAY BREAKOUT --------
+            # ================= BREAKOUT =================
             b1 = process_intraday_breakout(symbol, data)
             if b1:
-                BREAKOUT_LIST.append(b1)
+                if within_selection_window(now):
+                    try_replace(DAY_BREAKOUT, b1, "rf_pct")
+                else:
+                    try_replace(DAY_BREAKOUT, b1, "rf_pct")
 
-            # -------- INTRADAY BOOST --------
+            # ================= BOOST ====================
             b2 = process_intraday_boost(symbol, data)
             if b2:
-                BOOST_LIST.append(b2)
+                if within_selection_window(now):
+                    try_replace(DAY_BOOST, b2, "r_factor")
+                else:
+                    try_replace(DAY_BOOST, b2, "r_factor")
 
         except:
             continue
 
-    # ==================================================
-    # 🔥 FINAL SORTING LOGIC (ABS R-FACTOR / RF %)
-    # ==================================================
-
-    # 🔴 BREAKOUT → ABS RF % (BULL + BEAR STRONG MOVES)
     BREAKOUT_TOP = sorted(
-        BREAKOUT_LIST,
+        DAY_BREAKOUT.values(),
         key=lambda x: abs(x["rf_pct"]),
         reverse=True
-    )[:10]
+    )
 
-    # 🔴 BOOST → ABS R-FACTOR (BULL + BEAR STRONG MOVES)
     BOOST_TOP = sorted(
-        BOOST_LIST,
+        DAY_BOOST.values(),
         key=lambda x: abs(x["r_factor"]),
         reverse=True
-    )[:10]
+    )
 
     return {
         "breakout": BREAKOUT_TOP,
         "boost": BOOST_TOP,
-        "time": datetime.now(IST).strftime("%I:%M:%S %p")
+        "time": now.strftime("%I:%M:%S %p")
     }
 
 
