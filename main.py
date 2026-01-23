@@ -1,84 +1,69 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from dhanhq import dhanhq
-import os
-from zoneinfo import ZoneInfo
-from datetime import datetime, date
+from flask import Flask, jsonify, send_from_directory
+from stockmaster import get_5min_data
+from intradaybreakoutengine import breakout_score
+from intradayboostengine import boost_score
 
-from engines.intraday_breakout_engine import process_intraday_breakout
-from engines.intraday_boost_engine import process_intraday_boost
-from stocks_master import FO_STOCKS
+app = Flask(__name__)
 
-IST = ZoneInfo("Asia/Kolkata")
+# तुझी watchlist इथे बदलू शकतोस
+WATCHLIST = ["APOLLOHOSP", "VOLTAS", "OFSS", "PAYTM", "TATATECH"]
 
-app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+@app.route('/')
+def home():
+    return send_from_directory('.', 'fodashboard.html')
 
 
-def get_dhan_client():
-    return dhanhq(
-        os.getenv("CLIENT_ID"),
-        os.getenv("ACCESS_TOKEN")
-    )
+@app.route('/api/breakout')
+def breakout():
+    results = []
 
-
-@app.get("/intraday-data")
-def intraday_data():
-
-    dhan = get_dhan_client()
-
-    BREAKOUT_LIST = []
-    BOOST_LIST = []
-
-    for symbol, sid in FO_STOCKS.items():
+    for symbol in WATCHLIST:
         try:
-            quote = dhan.quote_data(securities={"NSE_EQ": [sid]})
-            nse = quote.get("data", {}).get("data", {}).get("NSE_EQ", {})
-            if str(sid) not in nse:
-                continue
+            df = get_5min_data(symbol)
+            bs = breakout_score(df)
+            results.append({
+                "symbol": symbol,
+                "bs": bs
+            })
+        except Exception as e:
+            results.append({
+                "symbol": symbol,
+                "bs": 0,
+                "error": str(e)
+            })
 
-            data = nse[str(sid)]
-
-            # -------- BREAKOUT (RF % BASED) --------
-            b1 = process_intraday_breakout(symbol, data)
-            if b1:
-                BREAKOUT_LIST.append(b1)
-
-            # -------- BOOST (R-FACTOR BASED) --------
-            b2 = process_intraday_boost(symbol, data)
-            if b2:
-                BOOST_LIST.append(b2)
-
-        except:
-            continue
-
-    # -------- SORTING LOGIC --------
-
-    # TOP 10 by RF % (Breakout)
-    BREAKOUT_TOP = sorted(
-        BREAKOUT_LIST,
-        key=lambda x: x["rf_pct"],
-        reverse=True
-    )[:10]
-
-    # TOP 10 by R-Factor (Boost)
-    BOOST_TOP = sorted(
-        BOOST_LIST,
-        key=lambda x: x["r_factor"],
-        reverse=True
-    )[:10]
-
-    return {
-        "breakout": BREAKOUT_TOP,
-        "boost": BOOST_TOP,
-        "time": datetime.now(IST).strftime("%I:%M:%S %p")
-    }
+    results = sorted(results, key=lambda x: x['bs'], reverse=True)
+    return jsonify(results)
 
 
-@app.get("/fo-dashboard", response_class=HTMLResponse)
-def fo_dashboard(request: Request):
-    return templates.TemplateResponse(
-        "fo_dashboard.html",
-        {"request": request}
-    )
+@app.route('/api/boost')
+def boost():
+    results = []
+
+    for symbol in WATCHLIST:
+        try:
+            df = get_5min_data(symbol)
+            bs = breakout_score(df)
+
+            # temporary RF logic (नंतर improve करू)
+            rf = bs / 2
+
+            bscore = boost_score(rf, bs)
+
+            results.append({
+                "symbol": symbol,
+                "boost": bscore
+            })
+        except Exception as e:
+            results.append({
+                "symbol": symbol,
+                "boost": 0,
+                "error": str(e)
+            })
+
+    results = sorted(results, key=lambda x: x['boost'], reverse=True)
+    return jsonify(results)
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
