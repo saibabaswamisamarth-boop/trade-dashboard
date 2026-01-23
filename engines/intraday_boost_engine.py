@@ -5,39 +5,44 @@ def pct(a, b):
 
 
 def process_intraday_boost(symbol, data):
-
     ohlc = data.get("ohlc", {})
+    depth = data.get("depth", {})
 
     open_p = ohlc.get("open", 0)
     high_p = ohlc.get("high", 0)
     low_p = ohlc.get("low", 0)
-
     price = data.get("last_price", 0)
     vwap = data.get("average_price", price)
     volume = data.get("volume", 0)
 
-    if not open_p or not price or not high_p or not low_p:
+    if not open_p or not price:
         return None
 
-    move_open = abs(pct(open_p, price))
+    # 1. Daily range capacity
     range_pct = abs(pct(low_p, high_p))
-    vwap_dist = abs(pct(vwap, price))
+    dc = 2 if range_pct > 2 else 0
 
-    r_factor = (
-        move_open * 2 +
-        range_pct * 1.5 +
-        vwap_dist * 2 +
-        (volume / 500000)
-    )
+    # 2. Big players
+    bids = sum([b.get("quantity", 0) for b in depth.get("buy", [])])
+    asks = sum([a.get("quantity", 0) for a in depth.get("sell", [])])
+    bpi = 2 if bids > asks * 1.5 or asks > bids * 1.5 else 0
 
-    r_factor = round(r_factor, 2)
-    score = round(r_factor / 5, 2)
+    # 3. VWAP distance
+    vd = 1.5 if abs(pct(vwap, price)) > 0.3 else 0
+
+    # 4. Volume power
+    vp = 2 if volume > 1200000 else 0
+
+    # 5. Volatility
+    vol = 1.5 if range_pct > 3 else 0
+
+    ibs = dc + bpi + vd + vp + vol
 
     signal = "BULLISH" if price > vwap else "BEARISH"
 
     return {
         "symbol": symbol,
-        "score": score,
-        "r_factor": r_factor,
+        "score": round(ibs, 2),
+        "r_factor": round(range_pct * 3, 2),
         "signal": signal
     }
