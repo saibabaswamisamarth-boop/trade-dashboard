@@ -5,39 +5,48 @@ def pct(a, b):
 
 
 def process_intraday_breakout(symbol, data):
-
     ohlc = data.get("ohlc", {})
+    depth = data.get("depth", {})
 
     open_p = ohlc.get("open", 0)
     high_p = ohlc.get("high", 0)
     low_p = ohlc.get("low", 0)
-    close_p = data.get("last_price", 0)
+    price = data.get("last_price", 0)
+    volume = data.get("volume", 0)
 
-    if not open_p or not close_p or not high_p or not low_p:
+    if not open_p or not price:
         return None
 
-    move_from_open = abs(pct(open_p, close_p))
-    range_pct = abs(pct(low_p, high_p))
+    # --- Notebook Logic Simulation ---
 
-    if close_p > open_p:
-        expansion = abs(pct(open_p, high_p))
-        signal = "BULLISH"
-    else:
-        expansion = abs(pct(open_p, low_p))
-        signal = "BEARISH"
+    # 1. New High / Low break
+    nh = 2 if price >= high_p or price <= low_p else 0
 
-    rf_pct = (
-        move_from_open * 3 +
-        expansion * 4 +
-        range_pct * 1.5
-    )
+    # 2. Candle strength
+    body = abs(pct(open_p, price))
+    cs = 1.5 if body > 0.4 else 0
 
-    rf_pct = round(rf_pct, 2)
-    score = round(rf_pct / 10, 1)
+    # 3. Volume spike
+    vol = 2 if volume > 800000 else 0
+
+    # 4. Buyer seller imbalance
+    bids = sum([b.get("quantity", 0) for b in depth.get("buy", [])])
+    asks = sum([a.get("quantity", 0) for a in depth.get("sell", [])])
+    bsi = 1.5 if bids > asks * 1.3 or asks > bids * 1.3 else 0
+
+    # 5. Position build
+    pb = 1 if body > 0.3 else 0
+
+    # 6. Market sync (simple)
+    mt = 1 if price > open_p else 0
+
+    bs = nh + cs + vol + bsi + pb + mt
+
+    signal = "BULLISH" if price > open_p else "BEARISH"
 
     return {
         "symbol": symbol,
-        "score": score,
-        "rf_pct": rf_pct,
+        "score": round(bs, 2),
+        "rf_pct": round(body * 5, 2),
         "signal": signal
     }
